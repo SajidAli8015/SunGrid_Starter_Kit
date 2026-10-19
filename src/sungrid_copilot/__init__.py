@@ -1,0 +1,1 @@
+"""SunGrid Cooperative Copilot prototype."""

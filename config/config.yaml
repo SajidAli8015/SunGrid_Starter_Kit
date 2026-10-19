@@ -1,0 +1,22 @@
+# Non-secret settings. Secrets and provider credentials come from environment variables
+# (see .env.example). Environment variables win over values here.
+
+llm:
+  provider: azure_openai     # overridden by LLM_PROVIDER
+  timeout_s: 30
+  max_retries: 2
+  temperature: 0
+  # Per-role model (or Azure deployment) overrides. null = use the provider's default model.
+  roles:
+    classifier:
+      model: null
+    extractor:
+      model: null
+    answerer:
+      model: null
+
+retrieval:
+  top_k: 5
+  classifier_min_conf: 0.6
+  non_relevant_min_conf: 0.85
+  min_score: null            # calibrated once retrieval exists

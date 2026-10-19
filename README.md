@@ -1,4 +1,46 @@
-# SunGrid Cooperative Copilot — Take-Home Assessment
+# SunGrid Cooperative Copilot
+
+Prototype Copilot that answers SunGrid member questions from the knowledge base in `docs/`
+(retrieval-augmented generation) and calls the eligibility service in `stub_tools.py` for
+Rooftop Rebate questions. Work in progress: so far only the scaffold, configuration and the
+provider-agnostic LLM layer exist.
+
+## Setup
+
+Requires Python 3.10+.
+
+```
+python -m venv .venv
+.venv\Scripts\activate          # Windows; on macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+copy .env.example .env          # macOS/Linux: cp .env.example .env, then fill in your values
+```
+
+## Check the LLM connection
+
+```
+python -m sungrid_copilot.cli check-llm
+```
+
+Prints the provider, model/deployment, endpoint host and whether the API key is set (never the
+key itself), then makes one plain call and one JSON call. Set `LLM_PROVIDER=fake` to run it
+offline.
+
+Providers: `azure_openai`, `openai`, `anthropic`, `gemini`, `fake`. **Only Azure OpenAI is
+tested end to end**; the other clients are written against their SDKs but unverified.
+
+## Tests
+
+```
+pytest
+```
+
+Tests use the `fake` provider and never touch the network.
+
+---
+
+## Starter kit (original README)
 
 This is a synthetic scenario. "SunGrid Cooperative" is fictional; any resemblance
 to a real company is coincidental. The full task brief is in the accompanying

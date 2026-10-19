@@ -1,0 +1,8 @@
+# Pinned to the versions installed and tested (Python 3.10).
+pydantic==2.14.1
+PyYAML==6.0.3
+python-dotenv==1.2.4
+openai==3.35.1
+anthropic==1.15.0
+google-genai==2.31.0
+pytest==9.1.1
