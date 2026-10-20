@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -18,6 +16,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError, create_model
 
+from sungrid_copilot.cache import JsonCache
 from sungrid_copilot.categories import NON_RELEVANT, CategorySet, load_categories
 from sungrid_copilot.config import Settings
 from sungrid_copilot.llm import LLMClient, get_llm_client
@@ -102,31 +101,6 @@ def _user_message(query: str) -> str:
     return f"Member question:\n<{_QUESTION_TAG}>\n{cleaned}\n</{_QUESTION_TAG}>"
 
 
-class ClassificationCache:
-    """One JSON file per (model, prompt hash, query). Safe to share across threads."""
-
-    def __init__(self, directory: Path):
-        self.directory = directory
-
-    @staticmethod
-    def key(model: str, prompt_hash: str, query: str) -> str:
-        return hashlib.sha256(f"{model}\n{prompt_hash}\n{query}".encode("utf-8")).hexdigest()
-
-    def get(self, key: str) -> dict | None:
-        path = self.directory / f"{key}.json"
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return None
-
-    def put(self, key: str, payload: dict) -> None:
-        self.directory.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=self.directory, suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, self.directory / f"{key}.json")
-
-
 class Classifier:
     def __init__(
         self,
@@ -145,7 +119,7 @@ class Classifier:
         self.prompt_hash = hashlib.sha256(
             f"{self.system_prompt}\n{schema_json}".encode("utf-8")
         ).hexdigest()[:16]
-        self.cache = ClassificationCache(cache_dir) if cache_dir else None
+        self.cache = JsonCache(cache_dir) if cache_dir else None
 
     @classmethod
     def from_settings(cls, settings: Settings, client: LLMClient | None = None) -> Classifier:
@@ -159,7 +133,7 @@ class Classifier:
     def classify(self, query: str, *, use_cache: bool = True) -> ClassifyOutcome:
         if not query.strip():
             raise ValueError("Query is empty.")
-        key = ClassificationCache.key(self.client.model, self.prompt_hash, query)
+        key = JsonCache.key(self.client.model, self.prompt_hash, query)
         if use_cache and self.cache:
             hit = self.cache.get(key)
             if hit is not None:
