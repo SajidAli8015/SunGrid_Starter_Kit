@@ -58,9 +58,14 @@ eligibility:
     focus: >-
       Explain only the process steps that follow for the member. Do not state any dollar amounts,
       any eligibility result, or whether the member qualifies.
+    # One or more plain questions per verdict; their hits are merged. One combined question
+    # embedded poorly (the documentation section ranked outside the top 8), hence a list.
     queries:
-      ineligible: How can a member appeal a rebate eligibility determination, and within what time limit?
-      eligible: What documents must a Rooftop Rebate applicant submit, and what happens when the program budget runs out?
+      ineligible:
+        - How can a member appeal a rebate eligibility determination, and within what time limit?
+      eligible:
+        - What must an applicant submit with a rebate application, and what happens to incomplete applications?
+        - What happens to new rebate applications when the program budget runs out?
 
 answer:
   max_tokens: 600

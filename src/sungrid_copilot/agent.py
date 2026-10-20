@@ -32,6 +32,7 @@ from sungrid_copilot.eligibility.slots import SLOT_ORDER, EligibilitySlots, Slot
 from sungrid_copilot.llm import LLMContentFilterError, LLMError, get_llm_client
 from sungrid_copilot.messages import Messages
 from sungrid_copilot.querylog import QueryLogger
+from sungrid_copilot.kb.store import SearchHit
 from sungrid_copilot.retrieval import RetrievalResult, Retriever
 from sungrid_copilot.usage import TrackedLLM, UsageTracker, estimate_cost
 
@@ -293,26 +294,32 @@ class CopilotAgent:
         eligible = outcome.decision.verdict is Verdict.ELIGIBLE_PRELIMINARY
         result = Outcome.ELIGIBLE_PRELIMINARY if eligible else Outcome.INELIGIBLE
         next_steps = self.settings.eligibility.next_steps
-        query = next_steps.queries.get("eligible" if eligible else "ineligible")
-        if not query:
+        queries = next_steps.queries.get("eligible" if eligible else "ineligible") or []
+        if not queries:
             return self._reply(run, result, deterministic)
 
-        # "What happens next" from the KB. The composer sees a fixed question, never the member's
+        # "What happens next" from the KB. The composer sees fixed questions, never the member's
         # text, slots or the service's amount.
         with self._step(run, "next_steps") as step:
             label = ClassificationResult(
                 category=next_steps.category, confidence=1.0,
                 needs_eligibility_check=False, rationale="next-steps lookup",
             )
-            retrieved = self.retriever.retrieve(query, label)
+            hits = _merge_hits(
+                [self.retriever.retrieve(q, label).hits for q in queries],
+                self.settings.retrieval.top_k,
+            )
+            question = " ".join(queries)
             try:
-                answer = self.composer.compose(query, retrieved.hits, focus=next_steps.focus)
+                answer = self.composer.compose(question, hits, focus=next_steps.focus)
             except LLMError as e:  # keep the deterministic decision
                 answer = None
                 step.summary = f"composer failed: {type(e).__name__}"
             else:
                 step.summary = _answer_summary(answer)
-        run.log["next_steps_retrieved"] = _retrieval_log(retrieved)["retrieved"]
+        run.log["next_steps_retrieved"] = [
+            {"chunk_id": h.chunk.chunk_id, "score": round(h.score, 4)} for h in hits
+        ]
         if answer is None or not answer.supported:
             return self._reply(run, result, deterministic)
 
@@ -397,6 +404,16 @@ def _response(
         trace=run.trace,
         details={},
     )
+
+
+def _merge_hits(results: list[list[SearchHit]], top_k: int) -> list[SearchHit]:
+    """Union of several searches: best score per chunk, highest first."""
+    best: dict[str, SearchHit] = {}
+    for hits in results:
+        for hit in hits:
+            if hit.chunk.chunk_id not in best or hit.score > best[hit.chunk.chunk_id].score:
+                best[hit.chunk.chunk_id] = hit
+    return sorted(best.values(), key=lambda h: h.score, reverse=True)[:top_k]
 
 
 def _retrieval_log(r: RetrievalResult) -> dict:

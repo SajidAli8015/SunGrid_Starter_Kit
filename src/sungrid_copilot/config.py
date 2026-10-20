@@ -13,7 +13,7 @@ from typing import Literal
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "config.yaml"
@@ -102,7 +102,14 @@ class NextStepsSettings(BaseModel):
         "Explain only the process steps that follow for the member. Do not state any dollar "
         "amounts, any eligibility result, or whether the member qualifies."
     )
-    queries: dict[str, str] = Field(default_factory=dict)  # keys: ineligible, eligible
+    queries: dict[str, list[str]] = Field(default_factory=dict)  # keys: ineligible, eligible
+
+    @field_validator("queries", mode="before")
+    @classmethod
+    def _single_query_as_list(cls, value: object) -> object:
+        if isinstance(value, dict):
+            return {k: [v] if isinstance(v, str) else v for k, v in value.items()}
+        return value
 
 
 class EligibilitySettings(BaseModel):

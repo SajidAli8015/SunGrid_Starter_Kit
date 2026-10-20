@@ -420,3 +420,29 @@ def test_log_includes_text_only_when_enabled(kb, tmp_path):
                 composer=FakeLLMClient({q(text): answer()}), include_text=True)
     h.ask(text)
     assert h.log_records()[0]["query_text"] == text
+
+
+def test_merge_hits_keeps_best_score_per_chunk():
+    from sungrid_copilot.agent import _merge_hits
+    from sungrid_copilot.kb.store import Chunk, SearchHit
+
+    def hit(cid, score):
+        chunk = Chunk(cid, "d", "T", "S", "t", "x", [], "p", "h", "i")
+        return SearchHit(chunk, score)
+
+    merged = _merge_hits([[hit("a", 0.5), hit("b", 0.9)], [hit("a", 0.7), hit("c", 0.1)]], top_k=2)
+    assert [(h.chunk.chunk_id, h.score) for h in merged] == [("b", 0.9), ("a", 0.7)]
+
+
+def test_several_next_steps_queries_are_merged_for_the_composer(kb, tmp_path):
+    settings = kb.model_copy(deep=True)
+    settings.eligibility.next_steps.queries["eligible"] = [
+        "What documentation do applicants submit?",
+        "How do I appeal a rebate determination?",
+    ]
+    text = "eligible? 94103, 85000/yr, 7.5 kW, approved, household"
+    composer = FakeLLMClient(default=answer("Next steps."))
+    h = _eligibility_harness(settings, tmp_path, {text: json.dumps(FULL_SLOTS)}, composer)
+    h.ask(text)
+    sent = composer.calls[0].messages[0]["content"]
+    assert "Rebate > Documentation" in sent and "Rebate > Appeals" in sent
