@@ -1,0 +1,311 @@
+# Held-out evaluation set for the SunGrid Copilot (20 questions).
+#
+# Provenance: written AFTER the first end-to-end demo runs, so it is not fully blind. Questions tagged
+# `seen_in_demo` closely mirror a demo query. Do not tune prompts, thresholds or the manifest against this set
+# before the baseline run; record any later change as a separate, labelled run.
+#
+# Schema
+#   turns:        list of {say, expect_outcome?}. One entry for single-turn questions. All turns share one Session.
+#   expect:       checks applied to the FINAL turn. A key set to null (or omitted) is not scored.
+#     category_any   classifier category must be one of these (snake_case; non_relevant allowed)
+#     sources        doc file stems that must ALL appear in the retrieved context (retrieval check) and are
+#                    also reported against the cited sources
+#     outcome_in     allowed values of the agent outcome
+#     tool_called    whether the eligibility service must (true) or must not (false) have been called
+#     escalated      whether the reply must be flagged for human review
+#     must_contain   regexes (case-insensitive) that must ALL match the final text
+#     must_not_contain regexes (case-insensitive) that must NOT match the final text
+#   reference:    short expected answer for the human grader (not machine-checked)
+version: 1
+questions:
+
+  - id: q01
+    tags: [program_policies, single_doc]
+    turns:
+      - say: "How often am I allowed to change my membership tier, and when does the change take effect?"
+    expect:
+      category_any: [program_policies]
+      sources: [01_program_policies]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['once', '12', 'next billing cycle']
+      must_not_contain: []
+    reference: "Once per 12-month period; takes effect on the first day of the next billing cycle."
+
+  - id: q02
+    tags: [program_policies, governance, incomplete_kb, hand_graded_critical, seen_in_demo]
+    turns:
+      - say: "Can a Community-tier member run for a seat on the cooperative board?"
+    expect:
+      category_any: [program_policies]
+      sources: [08_governance_voting]
+      outcome_in: [answered, abstained]
+      tool_called: false
+      escalated: true
+      must_contain: []
+      must_not_contain: []
+    reference: >
+      The KB does not say which tiers may stand. It says board seats are elected by Household-tier members and
+      candidates need 12 months in good standing; the policies doc says eligibility to hold board positions varies
+      by tier without specifying how. Correct behaviour: say it is not specified, give what is stated, flag for
+      review. A flat "No" or "only Household members can ..." is wrong. Judge by hand; regexes are too weak here.
+
+  - id: q03
+    tags: [incentive_rebate, single_doc]
+    turns:
+      - say: "What is the Rooftop Rebate per watt, and is there a maximum?"
+    expect:
+      category_any: [incentive_rebate]
+      sources: [02_incentive_rebate_programs]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['0\.40', '4,000']
+      must_not_contain: []
+    reference: "$0.40 per watt, capped at $4,000 per household."
+
+  - id: q04
+    tags: [incentive_rebate, battery, no_tool_trap]
+    turns:
+      - say: "Can I apply for the battery storage add-on incentive on its own, without applying for the rooftop rebate?"
+    expect:
+      category_any: [incentive_rebate]
+      sources: [09_battery_storage_incentive]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['rooftop']
+      must_not_contain: []
+    reference: >
+      No. It requires an approved Rooftop Rebate determination on file; standalone battery installs are not eligible.
+      The eligibility service must NOT be called (it only covers the rooftop rebate).
+
+  - id: q05
+    tags: [incentive_rebate, battery, arithmetic]
+    turns:
+      - say: "If I install a 13.5 kWh battery alongside my approved rooftop system, how much would the battery incentive be?"
+    expect:
+      category_any: [incentive_rebate]
+      sources: [09_battery_storage_incentive]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['1,500']
+      must_not_contain: []
+    reference: "13,500 Wh x $0.15 = $2,025, capped at $1,500 per household, so $1,500."
+
+  - id: q06
+    tags: [incentive_rebate, low_income, missing_value, no_tool_trap, seen_in_demo]
+    turns:
+      - say: "What household income do I need to be under to get the low-income bill credit?"
+    expect:
+      category_any: [incentive_rebate]
+      sources: [10_low_income_bill_credit]
+      outcome_in: [answered, abstained]
+      tool_called: false
+      escalated: null
+      must_contain: ['200\s?%']
+      must_not_contain: ['\$\s?\d{2,3},\d{3}']
+    reference: >
+      Income below 200% of the regional low-income threshold, verified annually. The threshold value is not in the
+      KB, so no dollar figure may be given. Credit is a flat $25 per month. The rooftop-rebate service must NOT be
+      called and its $120k threshold must not be used.
+
+  - id: q07
+    tags: [billing_account, single_doc]
+    turns:
+      - say: "When does the annual net metering true-up happen, and what happens if I generated more than I used?"
+    expect:
+      category_any: [billing_account]
+      sources: [11_net_metering_trueup]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['March', 'credit']
+      must_not_contain: []
+    reference: "Annual true-up for the 12-month cycle ending each March; net excess generation earns a credit at the tier's net metering rate, applied to the next regular bill."
+
+  - id: q08
+    tags: [billing_account, autopay, trap]
+    turns:
+      - say: "My autopay failed because my card expired. What happens next, and does the late-payment clock start over?"
+    expect:
+      category_any: [billing_account]
+      sources: [12_autopay_failure_policy]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['original due date']
+      must_not_contain: []
+    reference: "Two more retries over the next 5 business days, then manual-pay for that cycle. The 45-day and 90-day timelines run from the ORIGINAL due date, not from the failure date."
+
+  - id: q09
+    tags: [technical_installation, safety, seen_in_demo]
+    turns:
+      - say: "My inverter is showing fault code E07. What should I do?"
+    expect:
+      category_any: [technical_installation]
+      sources: [04_technical_installation_guidance]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: true
+      must_contain: ['installer', 'inspect']
+      must_not_contain: ['gateway\s+reset', 'reset\s+the\s+gateway']
+    reference: "E07 is a ground fault: it requires an installer inspection before re-energizing. Do not suggest a reset. Safety-related, flag for review."
+
+  - id: q10
+    tags: [technical_installation, terse_query, not_declined_trap]
+    turns:
+      - say: "Error E12"
+    expect:
+      category_any: [technical_installation]
+      sources: [04_technical_installation_guidance]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['gateway']
+      must_not_contain: []
+    reference: "E12 is a communication loss between the inverter and the monitoring gateway, often resolved by a gateway reset. A terse query must not be declined as non_relevant."
+
+  - id: q11
+    tags: [technical_installation, multi_hop]
+    turns:
+      - say: "We have an east/west split roof and want to add a battery. What inverter type and battery coupling do we need?"
+    expect:
+      category_any: [technical_installation]
+      sources: [04_technical_installation_guidance, 13_battery_storage_installation]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['micro-?inverter', 'AC[- ]?coupl']
+      must_not_contain: []
+    reference: "Micro-inverters are required for mixed-orientation roof sections; systems with micro-inverters need a battery with AC-coupling support."
+
+  - id: q12
+    tags: [company_updates, temporal, trap]
+    turns:
+      - say: "Is SunGrid adding a new membership tier, and would multi-family housing qualify for the rebate?"
+    expect:
+      category_any: [company_updates, program_policies]
+      sources: [05_company_updates]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['fourth|new', 'not\s+(yet\s+)?(been\s+)?(finali[sz]ed|published|determined)|not yet']
+      must_not_contain: ['multi-family[^.]{0,60}\b(are|would be|will be)\s+eligible']
+    reference: "A fourth tier for multi-family developments is planned for next fiscal year; eligibility and rebate treatment are not finalized and members should not rely on the document for eligibility guidance."
+
+  - id: q13
+    tags: [company_updates, single_doc, time_scope]
+    turns:
+      - say: "How many members does SunGrid have now, and how much solar capacity is installed?"
+    expect:
+      category_any: [company_updates]
+      sources: [14_annual_impact_report]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['5,000', '38']
+      must_not_contain: []
+    reference: "Just over 5,000 members across all tiers and 38 MW installed capacity, as of the end of the fiscal year in the annual report (not necessarily 'now')."
+
+  - id: q14
+    tags: [ambiguous_doc, billing_wording]
+    turns:
+      - say: "Why is there an extra charge on my bill after my rebate was cancelled?"
+    expect:
+      category_any: [incentive_rebate, billing_account]
+      sources: [06_ambiguous_rebate_billing_adjustments]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['\b6\b|six', 'appeal']
+      must_not_contain: []
+    reference: "A reversed rebate is recovered through a billing adjustment over up to 6 monthly cycles, with at least 30 days' written notice; appeal through the Incentive Program appeals process."
+
+  - id: q15
+    tags: [ambiguous_doc, rebate_wording, multi_hop, number_confusion]
+    turns:
+      - say: "My rebate was reversed because our installer turned out not to be approved. Who decides this, how long do I have to appeal and where do I appeal?"
+    expect:
+      category_any: [incentive_rebate, billing_account]
+      sources: [06_ambiguous_rebate_billing_adjustments, 02_incentive_rebate_programs]
+      outcome_in: [answered]
+      tool_called: false
+      escalated: null
+      must_contain: ['30\s*days', 'Incentive Program']
+      must_not_contain: ['appeal[^.]{0,80}15\s*business\s*days']
+    reference: "The Incentive Program committee makes the determination; appeal within 30 days of the determination through the Incentive Program appeals process, NOT the general grievance procedure (15 business days)."
+
+  - id: q16
+    tags: [eligibility, eligible, seen_in_demo]
+    turns:
+      - say: "Am I eligible for the rooftop rebate? I'm a Household-tier member in ZIP 94102, our household income is $72,000 a year, we're installing a 6 kW system, and the installer is SunGrid-approved."
+    expect:
+      category_any: [incentive_rebate]
+      sources: []
+      outcome_in: [eligible_preliminary]
+      tool_called: true
+      escalated: null
+      must_contain: ['2,400\.00', 'preliminary']
+      must_not_contain: []
+    reference: "Eligible on the pre-check: 6 kW x $0.40/W = $2,400.00 from the service, labelled preliminary with the funding/documentation caveat."
+
+  - id: q17
+    tags: [eligibility, ineligible, hard_gate, seen_in_demo]
+    turns:
+      - say: "Can I get the rooftop rebate? Household tier, ZIP 94105, we earn $135,000 a year, the system is 8 kW and our installer is SunGrid-approved."
+    expect:
+      category_any: [incentive_rebate]
+      sources: []
+      outcome_in: [ineligible]
+      tool_called: true
+      escalated: null
+      must_contain: ['not\s+qualify']
+      must_not_contain: ['\$', 'estimated\s+rebate', 'normally']
+    reference: "Ineligible (income over the regional threshold). The reply contains NO dollar amounts and no estimate, quotes the service's reason, and notes only the first failing check is reported."
+
+  - id: q18
+    tags: [eligibility, multi_turn, slot_filling, seen_in_demo]
+    turns:
+      - say: "I just had solar installed, can I get the rooftop rebate?"
+        expect_outcome: needs_info
+      - say: "I'm household tier, ZIP 94104, income $90,000 a year, 4.5 kW, and the installer is SunGrid-approved."
+    expect:
+      category_any: [incentive_rebate]
+      sources: []
+      outcome_in: [eligible_preliminary]
+      tool_called: true
+      escalated: null
+      must_contain: ['1,800\.00']
+      must_not_contain: []
+    reference: "Turn 1 asks ONE combined question for the missing details without calling the service. Turn 2 gives all details: eligible on the pre-check, 4.5 kW x $0.40/W = $1,800.00."
+
+  - id: q19
+    tags: [non_relevant]
+    turns:
+      - say: "What's a good Italian restaurant near downtown San Francisco?"
+    expect:
+      category_any: [non_relevant]
+      sources: []
+      outcome_in: [declined_out_of_scope]
+      tool_called: false
+      escalated: null
+      must_contain: []
+      must_not_contain: ['\$']
+    reference: "Politely declines: the assistant only handles SunGrid questions."
+
+  - id: q20
+    tags: [non_relevant]
+    turns:
+      - say: "Write me a short poem about autumn leaves."
+    expect:
+      category_any: [non_relevant]
+      sources: []
+      outcome_in: [declined_out_of_scope]
+      tool_called: false
+      escalated: null
+      must_contain: []
+      must_not_contain: []
+    reference: "Politely declines: the assistant only handles SunGrid questions."
