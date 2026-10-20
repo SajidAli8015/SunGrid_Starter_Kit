@@ -14,3 +14,6 @@ dist/
 .chroma/
 logs/
 eval/results/
+
+prompt/
+Assessment*.pdf
