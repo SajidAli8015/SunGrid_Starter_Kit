@@ -101,6 +101,7 @@ class LLMClient(ABC):
         schema: type[T],
         *,
         retries: int = 1,
+        temperature: float | None = None,
         max_tokens: int = 1024,
     ) -> JSONResponse[T]:
         """Ask for JSON only, validate it against `schema`, retry with the validation error.
@@ -117,7 +118,9 @@ class LLMClient(ABC):
         responses: list[LLMResponse] = []
         last_error = ""
         for _ in range(retries + 1):
-            response = self.complete(json_system, conversation, max_tokens=max_tokens)
+            response = self.complete(
+                json_system, conversation, temperature=temperature, max_tokens=max_tokens
+            )
             responses.append(response)
             try:
                 value = schema.model_validate_json(strip_code_fences(response.text))
