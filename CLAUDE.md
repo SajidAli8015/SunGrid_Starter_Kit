@@ -66,8 +66,8 @@ Categories (snake_case enum): `program_policies`, `incentive_rebate`, `billing_a
 - Chunk by `##` section. Embedding text = `"{doc title} > {section heading}\n{body}"` (headings such as
   "Eligibility" repeat across docs). Chunk metadata: doc_id, title, section, primary, secondary,
   source_path, content_hash, ingested_at.
-- Embeddings: local sentence-transformers (default `BAAI/bge-small-en-v1.5`, configurable), independent of
-  the chat provider. Store the embedding model name in the index; on mismatch fail loudly and say to re-ingest.
+- Embeddings: local fastembed (ONNX runtime, no PyTorch; default `BAAI/bge-small-en-v1.5`, configurable via
+  `embedding.model`), independent of the chat provider. Store the embedding model name in the index; on mismatch fail loudly and say to re-ingest.
 - Vector store: Chroma persistent in `.chroma/` (git-ignored). Ingestion is idempotent and rebuilds cleanly.
 
 ## Config
