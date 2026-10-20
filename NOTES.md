@@ -52,3 +52,4 @@ One line per item: what, and why.
 - Eval counts in `summary.md` come from repeat 1; `--repeat N` adds a stability section rather than averaging.
 - Full-context baseline scores only the text checks (contains, not-contains, hard gate) and skips eligibility and non_relevant questions; latency there is the composer call only.
 - The p95 latency in eval summaries uses the nearest-rank method; with 20 questions it is close to the maximum.
+- Baseline eval (run 20261020T155131Z, commit 3228bbc, untuned): auto_pass 18/20, no errors. q02 (board seat) repeats the demo-5 failure: it asserts candidates must be Household-tier (not in the KB) and is not escalated. q13 abstains although both Annual Impact Report chunks were retrieved, apparently because "now" is not the report's fiscal-year end. Neither was fixed in this task (baseline only).
