@@ -60,6 +60,20 @@ development set in `eval/dev_queries.yaml` and suggests `fallback_margin` and
 `non_relevant_score_ceiling`; it never edits the config. Its full report goes to
 `eval/results/calibration.json`.
 
+## Ask the Copilot
+
+```
+python -m sungrid_copilot.cli ask                       # interactive; type exit to quit
+python -m sungrid_copilot.cli ask --once "E07" --debug  # one message, with the trace
+```
+
+Each message is classified, retrieved, then either answered from the knowledge base with sources
+(or abstained and flagged), declined if clearly out of scope, or routed to the Rooftop Rebate
+eligibility flow, which asks for missing details across turns and calls the eligibility service
+once. Escalated replies end with "Flagged for human review". Every message appends one line to
+`logs/queries.jsonl` with outcome, retrieval, tokens and latency, and a hash of the text (never
+the text or any slot values).
+
 ## Tests
 
 ```
