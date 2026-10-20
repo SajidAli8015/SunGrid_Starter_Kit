@@ -290,6 +290,108 @@ def run_ask(once: str | None, debug: bool) -> int:
             _print_response(agent.handle(text, session), debug)
     return 0
 
+DEFAULT_QUESTIONS = PROJECT_ROOT / "eval" / "questions.yaml"
+RESULTS_DIR = PROJECT_ROOT / "eval" / "results"
+
+
+def run_eval_cli(args: argparse.Namespace) -> int:
+    """Run the held-out evaluation set and write results.json, summary.md and grade_sheet.csv."""
+    from datetime import datetime, timezone
+
+    from sungrid_copilot.answer import AnswerComposer
+    from sungrid_copilot.evaluation.full_context import run_full_context
+    from sungrid_copilot.evaluation.report import build_meta, write_outputs
+    from sungrid_copilot.evaluation.runner import run_eval
+    from sungrid_copilot.evaluation.schema import EvalSetError, load_eval_set
+    from sungrid_copilot.kb.ingest import build_chunks
+    from sungrid_copilot.usage import TrackedLLM, UsageTracker, estimate_cost
+
+    try:
+        settings = load_settings()
+        categories = load_categories(settings.categories.resolved_file)
+        entries = load_manifest(
+            settings.ingestion.resolved_manifest, settings.ingestion.resolved_docs_dir, categories
+        )
+        eval_set = load_eval_set(args.questions, {e.doc_id for e in entries})
+    except (*_ERRORS, EvalSetError) as e:
+        print(f"eval failed: {e}", file=sys.stderr)
+        return 1
+
+    questions = eval_set.questions
+    if args.ids:
+        wanted = {i.strip() for i in args.ids.split(",") if i.strip()}
+        questions = [q for q in questions if q.id in wanted]
+    if args.tags:
+        wanted_tags = {t.strip() for t in args.tags.split(",") if t.strip()}
+        questions = [q for q in questions if wanted_tags.intersection(q.tags)]
+    if not questions:
+        print("eval failed: no questions match --ids/--tags", file=sys.stderr)
+        return 1
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    suffix = "-full-context" if args.mode == "full-context" else ""
+    run_dir = args.out or RESULTS_DIR / f"{stamp}{suffix}"
+    title_to_stem = {e.title: e.doc_id for e in entries}
+    # Same member-session path as `ask` (LLM caches off), but logs go to the run folder.
+    run_settings = settings.model_copy(deep=True)
+    run_settings.logging.path = run_dir / "queries.jsonl"
+    print(f"Running {len(questions)} question(s), mode={args.mode}, workers={args.workers}, "
+          f"repeat={args.repeat} -> {run_dir}")
+
+    if args.mode == "pipeline":
+        records = run_eval(
+            questions,
+            lambda: CopilotAgent.from_settings(run_settings),
+            title_to_stem,
+            workers=args.workers,
+            repeat=args.repeat,
+        )
+    else:
+        chunks = build_chunks(
+            entries, settings.ingestion.resolved_docs_dir, settings.ingestion.max_chunk_tokens
+        )
+
+        def composer_factory():
+            usage = UsageTracker()
+            client = TrackedLLM(get_llm_client("answerer", settings), "answerer", usage)
+            return AnswerComposer.from_settings(settings, client=client), usage
+
+        records = run_full_context(
+            questions,
+            composer_factory,
+            chunks,
+            load_messages(Messages.load(settings.messages.resolved_file)),
+            title_to_stem,
+            workers=args.workers,
+            cost_fn=lambda calls: estimate_cost(calls, settings.llm.provider, settings.pricing),
+        )
+
+    models = sorted({c["model"] for r in records for c in r.get("llm_calls", [])})
+    meta = build_meta(
+        settings, args.questions, mode=args.mode, repeat=args.repeat, workers=args.workers,
+        model=", ".join(models) or "unknown",
+    )
+    write_outputs(run_dir, meta, records, eval_set)
+    summary = (run_dir / "summary.md").read_text(encoding="utf-8")
+    for section in ("## Automated checks", "## Failing questions"):
+        part = summary.split(section, 1)[1].split("\n## ", 1)[0]
+        print(f"\n{section}{part.rstrip()}")
+    print(f"\nRun folder: {run_dir}")
+    return 0
+
+
+def run_eval_summarize(run_dir: Path, grades: Path) -> int:
+    from sungrid_copilot.evaluation.report import GradeError, merge_grades
+
+    try:
+        text = merge_grades(run_dir, grades)
+    except (OSError, KeyError, GradeError) as e:
+        print(f"eval-summarize failed: {e}", file=sys.stderr)
+        return 1
+    header = "## Hand grading"
+    print((header + text.split(header, 1)[1]).strip())
+    return 0
+
 
 def main(argv: list[str] | None = None) -> int:
     # Piped output on Windows defaults to the locale code page; always emit UTF-8 instead.
@@ -336,7 +438,22 @@ def main(argv: list[str] | None = None) -> int:
     ask_parser = sub.add_parser("ask", help="Ask the Copilot (interactive; --once for one message)")
     ask_parser.add_argument("--once", metavar="QUESTION", help="Handle one message and exit")
     ask_parser.add_argument("--debug", action="store_true", help="Print the trace and usage")
+
+    eval_parser = sub.add_parser("eval", help="Run the held-out evaluation set")
+    eval_parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
+    eval_parser.add_argument("--ids", help="Comma-separated question ids")
+    eval_parser.add_argument("--tags", help="Comma-separated tags (any match)")
+    eval_parser.add_argument("--workers", type=int, default=3)
+    eval_parser.add_argument("--repeat", type=int, default=1)
+    eval_parser.add_argument("--out", type=Path, help="Run folder (default eval/results/<UTC time>/)")
+    eval_parser.add_argument("--mode", choices=["pipeline", "full-context"], default="pipeline")
+
+    summarize_parser = sub.add_parser("eval-summarize", help="Merge a filled grade sheet")
+    summarize_parser.add_argument("run_dir", type=Path)
+    summarize_parser.add_argument("--grades", type=Path, required=True)
     args = parser.parse_args(argv)
+    if getattr(args, "repeat", 1) < 1 or getattr(args, "workers", 1) < 1:
+        parser.error("--repeat and --workers must be at least 1")
     if getattr(args, "top_k", None) is not None and args.top_k < 1:
         parser.error("--top-k must be at least 1")
 
@@ -358,6 +475,10 @@ def main(argv: list[str] | None = None) -> int:
         return run_extract_slots(args.text, not args.no_cache)
     if args.command == "ask":
         return run_ask(args.once, args.debug)
+    if args.command == "eval":
+        return run_eval_cli(args)
+    if args.command == "eval-summarize":
+        return run_eval_summarize(args.run_dir, args.grades)
     return 2
 
 

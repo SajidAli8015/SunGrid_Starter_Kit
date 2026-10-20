@@ -46,3 +46,9 @@ One line per item: what, and why.
 - `TrackedLLM`/`UsageTracker` are request-scoped but not thread-safe; the CLI handles one message at a time. A server would need one tracker per request.
 - The agent runs with LLM caches off (they store member text); every `ask` message makes real calls. Tuning commands (`classify`, `calibrate`, `extract-slots`) keep their caches.
 - `escalation_notice` appends the composer's own `review_reason` to member-facing text; it is short LLM text, not a fixed string.
+- Eval `category_ok` uses the last classified category of a conversation, because a slot-filling reply to a pending eligibility question is not re-classified (q18's final turn).
+- Eval treats `service_unavailable` (provider failure) as an `error` for the question, separate from a wrong answer; errored questions cannot pass and do not stop the run.
+- Eval workers build their agents one at a time: concurrent Chroma client setup raced ("Could not connect to tenant default_tenant") in an offline smoke run, which made one worker's questions fail. Queries still run in parallel.
+- Eval counts in `summary.md` come from repeat 1; `--repeat N` adds a stability section rather than averaging.
+- Full-context baseline scores only the text checks (contains, not-contains, hard gate) and skips eligibility and non_relevant questions; latency there is the composer call only.
+- The p95 latency in eval summaries uses the nearest-rank method; with 20 questions it is close to the maximum.

@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 class QueryLogger:
+    _lock = threading.Lock()  # several agents (e.g. eval workers) may share one file
+
     def __init__(self, path: Path, *, include_query_text: bool = False):
         self.path = path
         self.include_query_text = include_query_text
@@ -26,7 +29,9 @@ class QueryLogger:
             **({"query_text": query} if self.include_query_text else {}),
             **record,
         }
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        line = json.dumps(entry, ensure_ascii=False) + "\n"
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(line)
         return entry
