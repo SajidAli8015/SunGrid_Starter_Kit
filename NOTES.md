@@ -18,3 +18,10 @@ One line per item: what, and why.
 - Ingestion always drops and rebuilds the whole collection (14 small docs); no incremental updates, even though `content_hash` would allow them.
 - fastembed caches the downloaded model in its default temp-dir cache; a cleaned temp dir means a re-download on the next run.
 - `search` uses fastembed's `query_embed`/`passage_embed` as-is; no BGE query instruction prefix or score threshold tuning yet.
+- The classifier's confidence is self-reported by the LLM and uncalibrated. It only ever widens search (low confidence -> unfiltered), except in the guarded `non_relevant` exit, which also needs weak unfiltered retrieval.
+- The classifier prompt names the Rooftop Rebate Program (for `needs_eligibility_check`) and the fault-code rule refers to "the category whose description covers fault codes" rather than naming a category, so all category text still comes from `config/categories.yaml`.
+- The fake LLM's dict keys match the system prompt as well as the last message; tests key on full query strings to avoid accidental matches.
+- The margin fallback compares top-1 scores only: when a wrong category's own chunk is the unfiltered top-1 (margin 0), the filter is kept and the right doc can drop out (dev set: 3/80 wrong-label cases at margin 0.05).
+- Unfiltered top-1 scores for in-scope and out-of-scope dev queries overlap: general-solar, other-utility and prompt-injection queries score like terse in-scope ones ("E07" 0.635). The score ceiling alone cannot decline safely; the classifier label carries most of that decision.
+- The dev set (28 queries) is small and written by us, so thresholds tuned on it are rough; the held-out evaluation set is the honest check.
+- The calibration "best ceiling" breaks ties toward the lowest value, because wrongly declining an in-scope question is worse than answering an out-of-scope one (grounding can still abstain).

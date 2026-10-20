@@ -44,6 +44,22 @@ locally with fastembed (`BAAI/bge-small-en-v1.5`, downloaded on first run, no Py
 rebuilds a Chroma index in `.chroma/`. `search` is raw vector search with no LLM call; it fails
 with a clear message if the index is missing or was built with a different embedding model.
 
+## Classify, retrieve and calibrate
+
+```
+python -m sungrid_copilot.cli classify "My inverter shows E07"
+python -m sungrid_copilot.cli retrieve "How long do I have to appeal a rebate decision?" --force-category program_policies
+python -m sungrid_copilot.cli calibrate
+```
+
+`classify` makes one LLM call (cached in `.cache/classify/`, `--no-cache` to bypass). Categories,
+their descriptions and examples come from `config/categories.yaml`. `retrieve` adds the
+category-filtered search with a margin-based fallback to unfiltered search, and prints why it
+chose what it did and whether the guarded `non_relevant` decline would apply. `calibrate` runs the
+development set in `eval/dev_queries.yaml` and suggests `fallback_margin` and
+`non_relevant_score_ceiling`; it never edits the config. Its full report goes to
+`eval/results/calibration.json`.
+
 ## Tests
 
 ```

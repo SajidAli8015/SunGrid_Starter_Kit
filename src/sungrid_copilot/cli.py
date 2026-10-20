@@ -5,20 +5,27 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from pydantic import BaseModel
 
+from sungrid_copilot.calibrate import format_summary, load_dev_set, run_calibration, save_report
 from sungrid_copilot.categories import CategoryError, load_categories
-from sungrid_copilot.config import ConfigError, load_settings
+from sungrid_copilot.classify import Classifier
+from sungrid_copilot.config import PROJECT_ROOT, ConfigError, load_settings
 from sungrid_copilot.kb.embeddings import EmbeddingError, get_embedder
 from sungrid_copilot.kb.ingest import ingest
-from sungrid_copilot.kb.manifest import ManifestError
+from sungrid_copilot.kb.manifest import ManifestError, load_manifest
 from sungrid_copilot.kb.search import search
 from sungrid_copilot.kb.store import IndexNotReadyError
 from sungrid_copilot.llm import LLMError, get_llm_client
 from sungrid_copilot.llm.factory import describe_provider
+from sungrid_copilot.retrieval import Retriever
 
 SNIPPET_CHARS = 120
+DEFAULT_DEV_SET = PROJECT_ROOT / "eval" / "dev_queries.yaml"
+CALIBRATION_REPORT = PROJECT_ROOT / "eval" / "results" / "calibration.json"
+_ERRORS = (ConfigError, CategoryError, ManifestError, IndexNotReadyError, EmbeddingError, LLMError)
 
 
 class _Ping(BaseModel):
@@ -111,6 +118,77 @@ def run_search(query: str, category: str | None, top_k: int | None, as_json: boo
     return 0
 
 
+def run_classify(query: str, use_cache: bool) -> int:
+    """Classify one query and print the parsed result."""
+    try:
+        outcome = Classifier.from_settings(load_settings()).classify(query, use_cache=use_cache)
+    except (*_ERRORS, ValueError) as e:
+        print(f"classify failed: {e}", file=sys.stderr)
+        return 1
+    print(json.dumps(outcome.result.model_dump(), indent=2, ensure_ascii=False))
+    source = "cache (no LLM call)" if outcome.cached else f"{outcome.model}, {outcome.latency_s:.2f}s"
+    print(f"[{source}; tokens {outcome.input_tokens} in / {outcome.output_tokens} out]")
+    return 0
+
+
+def run_retrieve(query: str, force_category: str | None, top_k: int | None, use_cache: bool) -> int:
+    """Classify + retrieve with diagnostics. No answer composition."""
+    try:
+        settings = load_settings()
+        retriever = Retriever.from_settings(settings)
+        if force_category:
+            retriever.categories.require(force_category)
+        result = Classifier.from_settings(settings).classify(query, use_cache=use_cache).result
+        retrieved = retriever.retrieve(query, result, force_category=force_category, top_k=top_k)
+    except (*_ERRORS, ValueError) as e:
+        print(f"retrieve failed: {e}", file=sys.stderr)
+        return 1
+
+    def fmt(x: float | None) -> str:
+        return "-" if x is None else f"{x:.3f}"
+
+    print(f"category:                {result.category} (confidence {result.confidence:.2f})")
+    print(f"needs_eligibility_check: {result.needs_eligibility_check}")
+    print(f"rationale:               {result.rationale}")
+    if force_category:
+        print(f"forced category:         {force_category}")
+    print(f"filter used:             {retrieved.filter_used or 'none (unfiltered)'}")
+    print(f"fallback reason:         {retrieved.fallback_reason or '-'}")
+    print(
+        f"top-1 scores:            unfiltered {fmt(retrieved.unfiltered_top_score)}, "
+        f"filtered {fmt(retrieved.filtered_top_score)}, margin {fmt(retrieved.margin)} "
+        f"(fallback_margin {settings.retrieval.fallback_margin})"
+    )
+    print(f"should_decline:          {retriever.should_decline(result, retrieved)}")
+    print()
+    for rank, hit in enumerate(retrieved.hits, 1):
+        print(f"{rank}. [{hit.score:.3f}] {hit.chunk.title} > {hit.chunk.section}")
+    return 0
+
+
+def run_calibrate(dev_set: Path, workers: int, use_cache: bool) -> int:
+    """Classifier accuracy, score distributions and margin sweep on the dev set."""
+    try:
+        settings = load_settings()
+        retriever = Retriever.from_settings(settings)
+        entries = load_manifest(
+            settings.ingestion.resolved_manifest,
+            settings.ingestion.resolved_docs_dir,
+            retriever.categories,
+        )
+        queries = load_dev_set(dev_set, retriever.categories, {e.doc_id for e in entries})
+        report = run_calibration(
+            Classifier.from_settings(settings), retriever, queries, workers=workers, use_cache=use_cache
+        )
+    except (*_ERRORS, ValueError, OSError) as e:
+        print(f"calibrate failed: {e}", file=sys.stderr)
+        return 1
+    save_report(report, CALIBRATION_REPORT)
+    print(format_summary(report))
+    print(f"\nFull report: {CALIBRATION_REPORT.relative_to(PROJECT_ROOT).as_posix()}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Piped output on Windows defaults to the locale code page; always emit UTF-8 instead.
     for stream in (sys.stdout, sys.stderr):
@@ -126,6 +204,21 @@ def main(argv: list[str] | None = None) -> int:
     search_parser.add_argument("--category", help="Filter to one category from config/categories.yaml")
     search_parser.add_argument("--top-k", type=int, default=None)
     search_parser.add_argument("--json", action="store_true", help="Machine-readable output")
+
+    classify_parser = sub.add_parser("classify", help="Classify one query (1 LLM call, cached)")
+    classify_parser.add_argument("query")
+    classify_parser.add_argument("--no-cache", action="store_true")
+
+    retrieve_parser = sub.add_parser("retrieve", help="Classify + retrieve with diagnostics")
+    retrieve_parser.add_argument("query")
+    retrieve_parser.add_argument("--force-category", help="Override the classifier's category")
+    retrieve_parser.add_argument("--top-k", type=int, default=None)
+    retrieve_parser.add_argument("--no-cache", action="store_true")
+
+    calibrate_parser = sub.add_parser("calibrate", help="Tune thresholds on the dev set")
+    calibrate_parser.add_argument("--dev-set", type=Path, default=DEFAULT_DEV_SET)
+    calibrate_parser.add_argument("--workers", type=int, default=3)
+    calibrate_parser.add_argument("--no-cache", action="store_true")
     args = parser.parse_args(argv)
     if getattr(args, "top_k", None) is not None and args.top_k < 1:
         parser.error("--top-k must be at least 1")
@@ -136,6 +229,12 @@ def main(argv: list[str] | None = None) -> int:
         return run_ingest()
     if args.command == "search":
         return run_search(args.query, args.category, args.top_k, args.json)
+    if args.command == "classify":
+        return run_classify(args.query, not args.no_cache)
+    if args.command == "retrieve":
+        return run_retrieve(args.query, args.force_category, args.top_k, not args.no_cache)
+    if args.command == "calibrate":
+        return run_calibrate(args.dev_set, args.workers, not args.no_cache)
     return 2
 
 
