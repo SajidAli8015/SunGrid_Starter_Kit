@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from sungrid_copilot.categories import Category
 from sungrid_copilot.config import Settings
 from sungrid_copilot.kb.embeddings import Embedder, get_embedder
 from sungrid_copilot.kb.store import ChromaVectorStore, SearchHit
@@ -13,7 +12,7 @@ def search(
     query: str,
     *,
     top_k: int | None = None,
-    category: Category | None = None,
+    category: str | None = None,
     embedder: Embedder | None = None,
 ) -> list[SearchHit]:
     model_name = embedder.model_name if embedder else settings.embedding.model

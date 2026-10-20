@@ -6,6 +6,7 @@ import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sungrid_copilot.categories import load_categories
 from sungrid_copilot.config import PROJECT_ROOT, Settings
 from sungrid_copilot.kb.chunking import split_sections
 from sungrid_copilot.kb.embeddings import Embedder
@@ -29,8 +30,8 @@ def build_chunks(
                     title=entry.title,
                     section=section.heading,
                     text=section.body,
-                    primary=entry.primary.value,
-                    secondary=[c.value for c in entry.secondary],
+                    primary=entry.primary,
+                    secondary=list(entry.secondary),
                     source_path=_display_path(path),
                     content_hash=hashlib.sha256(section.body.encode("utf-8")).hexdigest()[:16],
                     ingested_at=ingested_at,
@@ -42,7 +43,9 @@ def build_chunks(
 def ingest(settings: Settings, embedder: Embedder) -> dict[str, int]:
     """Drop and rebuild the collection. Returns chunk counts per doc_id, in manifest order."""
     entries = load_manifest(
-        settings.ingestion.resolved_manifest, settings.ingestion.resolved_docs_dir
+        settings.ingestion.resolved_manifest,
+        settings.ingestion.resolved_docs_dir,
+        load_categories(settings.categories.resolved_file),
     )
     chunks = build_chunks(
         entries, settings.ingestion.resolved_docs_dir, settings.ingestion.max_chunk_tokens

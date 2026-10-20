@@ -1,8 +1,17 @@
 import pytest
 
 from kb_helpers import entry, write_kb
+from sungrid_copilot.categories import load_categories
 from sungrid_copilot.config import load_settings
-from sungrid_copilot.kb.manifest import ManifestError, load_manifest
+from sungrid_copilot.kb.manifest import ManifestError
+from sungrid_copilot.kb.manifest import load_manifest as _load_manifest
+
+CATEGORIES = load_categories(load_settings().categories.resolved_file)
+
+
+def load_manifest(manifest, docs_dir):
+    return _load_manifest(manifest, docs_dir, CATEGORIES)
+
 
 DOCS = {"alpha.md": "# Alpha\n## A\nText.\n", "beta.md": "# Beta\n## B\nText.\n"}
 

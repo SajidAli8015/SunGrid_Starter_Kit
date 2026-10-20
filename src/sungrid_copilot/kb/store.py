@@ -10,8 +10,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
-from sungrid_copilot.categories import Category
-
 _INGEST_HINT = "Run `python -m sungrid_copilot.cli ingest` to rebuild the index."
 
 
@@ -55,7 +53,7 @@ class VectorStore(ABC):
 
     @abstractmethod
     def query(
-        self, embedding: list[float], top_k: int, category: Category | str | None = None
+        self, embedding: list[float], top_k: int, category: str | None = None
     ) -> list[SearchHit]:
         """Top-k by similarity. With a category, only chunks whose primary OR secondary matches."""
 
@@ -109,12 +107,12 @@ class ChromaVectorStore(VectorStore):
         )
 
     def query(
-        self, embedding: list[float], top_k: int, category: Category | str | None = None
+        self, embedding: list[float], top_k: int, category: str | None = None
     ) -> list[SearchHit]:
         total = self.count()
         if total == 0:
             return []
-        where = {f"cat_{Category(category).value}": True} if category else None
+        where = {f"cat_{category}": True} if category else None
         result = self._collection.query(
             query_embeddings=[embedding],
             n_results=min(top_k, total),

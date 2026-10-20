@@ -71,15 +71,37 @@ class IngestionSettings(BaseModel):
         return _resolve(self.manifest)
 
 
+class CategoriesSettings(BaseModel):
+    file: Path = Path("config/categories.yaml")
+
+    @property
+    def resolved_file(self) -> Path:
+        return _resolve(self.file)
+
+
+class ClassifierSettings(BaseModel):
+    max_tokens: int = Field(200, gt=0)
+    cache_dir: Path = Path(".cache/classify")
+
+    @property
+    def resolved_cache_dir(self) -> Path:
+        return _resolve(self.cache_dir)
+
+
 class RetrievalSettings(BaseModel):
     top_k: int = Field(5, gt=0)
     classifier_min_conf: float = Field(0.6, ge=0, le=1)
     non_relevant_min_conf: float = Field(0.85, ge=0, le=1)
-    min_score: float | None = None
+    # Use the category filter only if its top-1 is within this of the unfiltered top-1.
+    fallback_margin: float = Field(0.05, ge=0, le=1)
+    # A confident non_relevant label is declined only if unfiltered top-1 is below this.
+    non_relevant_score_ceiling: float = Field(0.60, ge=0, le=1)
 
 
 class Settings(BaseModel):
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    categories: CategoriesSettings = Field(default_factory=CategoriesSettings)
+    classifier: ClassifierSettings = Field(default_factory=ClassifierSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
     ingestion: IngestionSettings = Field(default_factory=IngestionSettings)

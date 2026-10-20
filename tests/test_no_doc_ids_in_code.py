@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 
+from sungrid_copilot.categories import load_categories
 from sungrid_copilot.config import load_settings
 from sungrid_copilot.kb.manifest import load_manifest
 
@@ -11,7 +12,11 @@ SRC = Path(__file__).resolve().parents[1] / "src"
 
 def _forbidden_patterns() -> list[tuple[str, re.Pattern]]:
     settings = load_settings()
-    entries = load_manifest(settings.ingestion.resolved_manifest, settings.ingestion.resolved_docs_dir)
+    entries = load_manifest(
+        settings.ingestion.resolved_manifest,
+        settings.ingestion.resolved_docs_dir,
+        load_categories(settings.categories.resolved_file),
+    )
     patterns = []
     for e in entries:
         stem = Path(e.file).stem

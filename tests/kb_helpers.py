@@ -1,4 +1,4 @@
-"""Build a tiny synthetic knowledge base on disk for tests."""
+"""Build tiny synthetic knowledge bases and category files on disk for tests."""
 
 from pathlib import Path
 
@@ -25,3 +25,18 @@ def entry(file: str, primary: str, secondary: list[str] | None = None) -> dict:
         "owner": "Test team",
         "note": "",
     }
+
+
+def category(name: str, description: str = "Things members ask about.") -> dict:
+    return {
+        "name": name,
+        "display_name": name.replace("_", " ").title(),
+        "description": description,
+        "examples": [f"A question about {name}?"],
+    }
+
+
+def write_categories(root: Path, categories: list[dict]) -> Path:
+    path = root / "categories.yaml"
+    path.write_text(yaml.safe_dump({"categories": categories}), encoding="utf-8")
+    return path

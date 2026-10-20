@@ -17,3 +17,4 @@ eval/results/
 
 prompt/
 Assessment*.pdf
+.cache/

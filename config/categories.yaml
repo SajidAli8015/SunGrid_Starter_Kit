@@ -1,0 +1,54 @@
+# Single source of truth for query/document categories.
+# Used by manifest validation, the classifier prompt and the retrieval filter.
+# `non_relevant` is a built-in reserved query label: never list it here or tag a document with it.
+# Adding a category = a new entry here + manifest entries. No code change.
+categories:
+  - name: program_policies
+    display_name: Program Policies
+    description: >-
+      Membership tiers, the installer code of conduct, grievances, data privacy and tier transfers;
+      also installer certification and renewal, governance, voting and board elections.
+    examples:
+      - What is the difference between the Community and Household tiers?
+      - How do I file a complaint about my installer?
+      - Who gets to vote in board elections?
+
+  - name: incentive_rebate
+    display_name: Incentives & Rebates
+    description: >-
+      The Rooftop Rebate, Commercial Incentive, Battery Storage Add-On and Low-Income Bill Credit
+      programs, appeals and funding status: who qualifies and how much they pay out.
+    examples:
+      - How much is the rooftop rebate per watt?
+      - Can I appeal a rebate denial?
+      - Is there a waitlist for the rebate this year?
+
+  - name: billing_account
+    display_name: Billing & Account
+    description: >-
+      Monthly bills, membership fees, net metering rates, the annual true-up, payments, autopay,
+      late payment and billing disputes.
+    examples:
+      - When is my bill due?
+      - My autopay failed, what happens now?
+      - Why did I get a charge at true-up?
+
+  - name: technical_installation
+    display_name: Technical & Installation
+    description: >-
+      Site assessment, inverters, battery installation requirements, interconnection, monitoring,
+      fault codes, roof suitability and system performance.
+    examples:
+      - What does fault code E12 mean?
+      - How long does utility interconnection take?
+      - Is my roof too shaded for panels?
+
+  - name: company_updates
+    display_name: Company Updates
+    description: >-
+      Newsletters, board member news, planned changes, community array expansion, recognition
+      and annual impact figures.
+    examples:
+      - Who joined the board recently?
+      - Is SunGrid building another community array?
+      - How many members does SunGrid have now?

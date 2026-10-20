@@ -15,6 +15,13 @@ llm:
     answerer:
       model: null
 
+categories:
+  file: config/categories.yaml    # single source of truth for category names and descriptions
+
+classifier:
+  max_tokens: 200
+  cache_dir: .cache/classify      # git-ignored; keyed by model, prompt hash and query
+
 embedding:
   model: BAAI/bge-small-en-v1.5   # local fastembed (ONNX); independent of the chat provider
 
@@ -31,4 +38,6 @@ retrieval:
   top_k: 5
   classifier_min_conf: 0.6
   non_relevant_min_conf: 0.85
-  min_score: null            # calibrated once retrieval exists
+  # Starting guesses; set them from `python -m sungrid_copilot.cli calibrate` on the dev set.
+  fallback_margin: 0.05            # filtered top-1 must be within this of unfiltered top-1
+  non_relevant_score_ceiling: 0.60 # decline non_relevant only if unfiltered top-1 is below this

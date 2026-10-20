@@ -8,7 +8,7 @@ import sys
 
 from pydantic import BaseModel
 
-from sungrid_copilot.categories import DOC_CATEGORIES, Category
+from sungrid_copilot.categories import CategoryError, load_categories
 from sungrid_copilot.config import ConfigError, load_settings
 from sungrid_copilot.kb.embeddings import EmbeddingError, get_embedder
 from sungrid_copilot.kb.ingest import ingest
@@ -62,7 +62,7 @@ def run_ingest() -> int:
     try:
         settings = load_settings()
         counts = ingest(settings, get_embedder(settings.embedding.model))
-    except (ConfigError, ManifestError, EmbeddingError) as e:
+    except (ConfigError, CategoryError, ManifestError, EmbeddingError) as e:
         print(f"ingest failed: {e}", file=sys.stderr)
         return 1
     width = max(len(doc_id) for doc_id in counts)
@@ -77,10 +77,10 @@ def run_search(query: str, category: str | None, top_k: int | None, as_json: boo
     """Print raw retrieval results. No LLM call."""
     try:
         settings = load_settings()
-        hits = search(
-            settings, query, top_k=top_k, category=Category(category) if category else None
-        )
-    except (ConfigError, IndexNotReadyError, EmbeddingError) as e:
+        if category:
+            load_categories(settings.categories.resolved_file).require(category)
+        hits = search(settings, query, top_k=top_k, category=category)
+    except (ConfigError, CategoryError, IndexNotReadyError, EmbeddingError) as e:
         print(f"search failed: {e}", file=sys.stderr)
         return 1
 
@@ -123,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("ingest", help="Rebuild the vector index from docs/")
     search_parser = sub.add_parser("search", help="Raw vector search (no LLM)")
     search_parser.add_argument("query")
-    search_parser.add_argument("--category", choices=[c.value for c in DOC_CATEGORIES])
+    search_parser.add_argument("--category", help="Filter to one category from config/categories.yaml")
     search_parser.add_argument("--top-k", type=int, default=None)
     search_parser.add_argument("--json", action="store_true", help="Machine-readable output")
     args = parser.parse_args(argv)
