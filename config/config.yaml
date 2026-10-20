@@ -41,3 +41,14 @@ retrieval:
   # Set from `python -m sungrid_copilot.cli calibrate` on the dev set (see NOTES.md).
   fallback_margin: 0.04            # filtered top-1 must be within this of unfiltered top-1
   non_relevant_score_ceiling: 0.60 # decline non_relevant only if unfiltered top-1 is below this
+
+messages:
+  file: config/messages.yaml      # all fixed user-facing text
+
+eligibility:
+  # The Rooftop Rebate eligibility service, loaded by name. Called only through eligibility/adapter.py.
+  service_module: stub_tools
+  service_function: check_rebate_eligibility
+  timeout_s: 5                    # single attempt, no retries
+  extractor_max_tokens: 200
+  cache_dir: .cache/extract       # git-ignored slot-extraction cache

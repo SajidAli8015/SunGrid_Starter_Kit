@@ -14,3 +14,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The repo root holds the eligibility service module (stub_tools.py), loaded by name.
+pythonpath = ["."]

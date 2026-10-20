@@ -88,6 +88,27 @@ class ClassifierSettings(BaseModel):
         return _resolve(self.cache_dir)
 
 
+class MessagesSettings(BaseModel):
+    file: Path = Path("config/messages.yaml")
+
+    @property
+    def resolved_file(self) -> Path:
+        return _resolve(self.file)
+
+
+class EligibilitySettings(BaseModel):
+    # The service is loaded by name so no code depends on where the stub lives.
+    service_module: str = "stub_tools"
+    service_function: str = "check_rebate_eligibility"
+    timeout_s: float = Field(5, gt=0)
+    extractor_max_tokens: int = Field(200, gt=0)
+    cache_dir: Path = Path(".cache/extract")
+
+    @property
+    def resolved_cache_dir(self) -> Path:
+        return _resolve(self.cache_dir)
+
+
 class RetrievalSettings(BaseModel):
     top_k: int = Field(5, gt=0)
     classifier_min_conf: float = Field(0.6, ge=0, le=1)
@@ -106,6 +127,8 @@ class Settings(BaseModel):
     vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
     ingestion: IngestionSettings = Field(default_factory=IngestionSettings)
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
+    messages: MessagesSettings = Field(default_factory=MessagesSettings)
+    eligibility: EligibilitySettings = Field(default_factory=EligibilitySettings)
 
 
 def _resolve(path: Path) -> Path:

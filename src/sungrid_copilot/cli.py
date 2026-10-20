@@ -13,6 +13,11 @@ from sungrid_copilot.calibrate import format_summary, load_dev_set, run_calibrat
 from sungrid_copilot.categories import CategoryError, load_categories
 from sungrid_copilot.classify import Classifier
 from sungrid_copilot.config import PROJECT_ROOT, ConfigError, load_settings
+from sungrid_copilot.eligibility.adapter import EligibilityAdapter
+from sungrid_copilot.eligibility.flow import run_eligibility
+from sungrid_copilot.eligibility.guard import check_final_text
+from sungrid_copilot.eligibility.render import load_messages, render
+from sungrid_copilot.eligibility.slots import EligibilitySlots, SlotExtractor
 from sungrid_copilot.kb.embeddings import EmbeddingError, get_embedder
 from sungrid_copilot.kb.ingest import ingest
 from sungrid_copilot.kb.manifest import ManifestError, load_manifest
@@ -20,12 +25,24 @@ from sungrid_copilot.kb.search import search
 from sungrid_copilot.kb.store import IndexNotReadyError
 from sungrid_copilot.llm import LLMError, get_llm_client
 from sungrid_copilot.llm.factory import describe_provider
+from sungrid_copilot.messages import Messages, MessagesError
 from sungrid_copilot.retrieval import Retriever
 
 SNIPPET_CHARS = 120
 DEFAULT_DEV_SET = PROJECT_ROOT / "eval" / "dev_queries.yaml"
 CALIBRATION_REPORT = PROJECT_ROOT / "eval" / "results" / "calibration.json"
 _ERRORS = (ConfigError, CategoryError, ManifestError, IndexNotReadyError, EmbeddingError, LLMError)
+
+
+def _print_eligibility(slots: EligibilitySlots, settings) -> None:
+    messages = load_messages(Messages.load(settings.messages.resolved_file))
+    outcome = run_eligibility(slots, EligibilityAdapter.from_settings(settings))
+    text = render(outcome, messages)
+    print(f"outcome:   {outcome}")
+    print(f"escalate:  {outcome.escalate}")
+    print(f"guard:     {check_final_text(text, outcome, messages) or 'no violations'}")
+    print()
+    print(text)
 
 
 class _Ping(BaseModel):
@@ -189,6 +206,39 @@ def run_calibrate(dev_set: Path, workers: int, use_cache: bool) -> int:
     return 0
 
 
+def run_eligibility_cli(args: argparse.Namespace) -> int:
+    """Run the eligibility flow from explicit options. No LLM."""
+    try:
+        settings = load_settings()
+        installer = None if args.installer_approved is None else args.installer_approved == "yes"
+        slots = EligibilitySlots(
+            household_zip=args.zip,
+            annual_income_usd=args.income,
+            system_size_kw=args.size_kw,
+            installer_approved=installer,
+            member_tier=args.tier,
+        )
+        _print_eligibility(slots, settings)
+    except (ConfigError, MessagesError) as e:
+        print(f"eligibility failed: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def run_extract_slots(text: str, use_cache: bool) -> int:
+    """Extract slots with the LLM (role: extractor), then show what the flow would do."""
+    try:
+        settings = load_settings()
+        slots = SlotExtractor.from_settings(settings).extract(text, use_cache=use_cache)
+        print(json.dumps(slots.model_dump(), indent=2, ensure_ascii=False))
+        print(f"missing:   {slots.missing() or 'none'}\n")
+        _print_eligibility(slots, settings)
+    except (*_ERRORS, MessagesError) as e:
+        print(f"extract-slots failed: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Piped output on Windows defaults to the locale code page; always emit UTF-8 instead.
     for stream in (sys.stdout, sys.stderr):
@@ -219,6 +269,17 @@ def main(argv: list[str] | None = None) -> int:
     calibrate_parser.add_argument("--dev-set", type=Path, default=DEFAULT_DEV_SET)
     calibrate_parser.add_argument("--workers", type=int, default=3)
     calibrate_parser.add_argument("--no-cache", action="store_true")
+
+    elig_parser = sub.add_parser("eligibility", help="Rooftop Rebate flow from explicit values (no LLM)")
+    elig_parser.add_argument("--zip", help="Household ZIP code")
+    elig_parser.add_argument("--income", type=float, help="Annual household AGI in USD")
+    elig_parser.add_argument("--size-kw", type=float, help="System size in kW")
+    elig_parser.add_argument("--installer-approved", choices=["yes", "no"])
+    elig_parser.add_argument("--tier", choices=["community", "household", "commercial"])
+
+    extract_parser = sub.add_parser("extract-slots", help="Extract eligibility slots (1 LLM call)")
+    extract_parser.add_argument("text")
+    extract_parser.add_argument("--no-cache", action="store_true")
     args = parser.parse_args(argv)
     if getattr(args, "top_k", None) is not None and args.top_k < 1:
         parser.error("--top-k must be at least 1")
@@ -235,6 +296,10 @@ def main(argv: list[str] | None = None) -> int:
         return run_retrieve(args.query, args.force_category, args.top_k, not args.no_cache)
     if args.command == "calibrate":
         return run_calibrate(args.dev_set, args.workers, not args.no_cache)
+    if args.command == "eligibility":
+        return run_eligibility_cli(args)
+    if args.command == "extract-slots":
+        return run_extract_slots(args.text, not args.no_cache)
     return 2
 
 

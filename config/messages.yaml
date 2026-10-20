@@ -1,0 +1,54 @@
+# Fixed user-facing text. Code fills the {placeholders}; it never writes member-facing prose itself.
+# Amounts are inserted by code in the format $1,234.56 and only into eligible_preliminary.
+
+# --- Rooftop Rebate eligibility: clarifying questions ---------------------------------------------
+ask_missing_intro: "To run the Rooftop Rebate pre-check I need a few more details:"
+q_household_zip: What is the 5-digit ZIP code of the home where the system is (or will be) installed?
+q_annual_income_usd: What is your household's annual adjusted gross income (the figure on your tax return)?
+q_system_size_kw: What is the size of the rooftop solar system, in kW?
+q_installer_approved: >-
+  Was your installer on SunGrid's approved installer list, with their certification current, at the
+  time of installation?
+q_member_tier: Are you a Community, Household or Commercial tier member?
+
+# --- Rooftop Rebate eligibility: outcomes ----------------------------------------------------------
+ineligible: >-
+  Based on the information you provided, you do not qualify for the Rooftop Rebate. The eligibility
+  service reported: "{reason}" The service reports only the first condition it finds unmet, so other
+  conditions were not evaluated.
+eligible_preliminary: >-
+  The eligibility pre-check indicates that you appear to meet the Rooftop Rebate conditions it
+  checked. The service's estimated rebate is {amount}.
+eligible_caveat: >-
+  This is a preliminary check, not a formal eligibility determination or approval. Final approval
+  depends on program funding and on meeting the program's documentation requirements, and the
+  determination is made by the Incentive Program committee.
+tier_not_household: >-
+  The Rooftop Rebate is for Household-tier members installing a new rooftop system, so no
+  eligibility check was run for your {tier} membership. Your question has been flagged for a
+  member-support specialist, who can advise on your options.
+invalid_input: "I couldn't use the {field} you gave: {problem}. Could you check it and send it again?"
+tool_error: >-
+  I can't complete the eligibility check right now, so I'm not able to say whether you qualify.
+  Your question has been passed to a member-support specialist, who will follow up.
+
+# Names and problems used in invalid_input. Keys are the codes the adapter returns.
+fields:
+  household_zip: ZIP code
+  annual_income_usd: annual household income
+  system_size_kw: system size
+  installer_approved: installer approval answer
+problems:
+  not_a_zip: it needs to be a 5-digit ZIP code, like 94103
+  not_a_number: it needs to be a number
+  not_finite: it needs to be a real number
+  negative: it can't be negative
+  not_positive: it needs to be more than zero
+  too_large: it looks too large to be right
+  not_yes_no: it needs to be a clear yes or no
+
+# Member tiers as shown to members.
+tiers:
+  community: Community-tier
+  household: Household-tier
+  commercial: Commercial-tier
