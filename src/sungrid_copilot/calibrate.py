@@ -196,7 +196,8 @@ def run_calibration(
             if r.get("needs_eligibility_check") != r["expect_eligibility_check"]
         ],
         "errors": len(rows) - len(ok),
-        "llm_calls": sum(1 for o in outcomes.values() if not isinstance(o, str) and not o.cached),
+        # Failed calls count too: errors are not cached, so they are retried on every run.
+        "llm_calls": sum(1 for o in outcomes.values() if isinstance(o, str) or not o.cached),
         "cached": sum(1 for o in outcomes.values() if not isinstance(o, str) and o.cached),
         "declined_out_of_scope": sum(
             bool(r.get("would_decline")) for r in rows if r["id"] not in in_scope_ids
@@ -253,7 +254,7 @@ def format_summary(report: dict) -> str:
     c, s, rc = report["classification"], report["scores"], report["robustness_current"]
     out = [
         f"Classifier: {report['classifier']['model']} (prompt {report['classifier']['prompt_hash']}); "
-        f"{c['llm_calls']} LLM call(s), {c['cached']} cached, {c['errors']} error(s)",
+        f"{c['llm_calls']} LLM call(s) made ({c['errors']} failed, not cached), {c['cached']} cached",
         "",
         "1. Classification",
         f"   category: {c['category_correct']}/{c['n']} correct",

@@ -109,3 +109,13 @@ def test_real_dev_set_is_valid():
     assert sum(q.in_scope for q in queries) == 20
     for name in CATEGORIES.names:
         assert sum(q.expected_category == name for q in queries) >= 3
+
+
+def test_failed_classification_is_counted_and_retried(setup):
+    classifier, retriever, queries, client = setup
+    del client._by_key["poem about the sea"]  # no scripted reply: the fake raises LLMError
+    for _ in range(2):
+        c = run_calibration(classifier, retriever, queries, workers=2)["classification"]
+        assert c["errors"] == 1
+        assert c["misses"][-1]["got"] == "ERROR"
+    assert c["llm_calls"] == 1 and c["cached"] == 2  # the failure is retried, never cached
