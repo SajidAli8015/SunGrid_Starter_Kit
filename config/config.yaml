@@ -38,6 +38,6 @@ retrieval:
   top_k: 5
   classifier_min_conf: 0.6
   non_relevant_min_conf: 0.85
-  # Starting guesses; set them from `python -m sungrid_copilot.cli calibrate` on the dev set.
-  fallback_margin: 0.05            # filtered top-1 must be within this of unfiltered top-1
+  # Set from `python -m sungrid_copilot.cli calibrate` on the dev set (see NOTES.md).
+  fallback_margin: 0.04            # filtered top-1 must be within this of unfiltered top-1
   non_relevant_score_ceiling: 0.60 # decline non_relevant only if unfiltered top-1 is below this
