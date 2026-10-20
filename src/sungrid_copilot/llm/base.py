@@ -28,6 +28,11 @@ class LLMError(Exception):
     """Any failure talking to, or parsing output from, an LLM. Never contains keys or headers."""
 
 
+class LLMContentFilterError(LLMError):
+    """The provider rejected the INPUT with a content-filter response. Callers should treat the
+    request as refused (not retried, not answered from guesswork)."""
+
+
 @dataclass(frozen=True)
 class LLMResponse:
     text: str
@@ -91,6 +96,9 @@ class LLMClient(ABC):
         except LLMError:
             raise
         except Exception as e:  # any SDK failure (auth, HTTP, timeout) becomes one typed error
+            translated = self._translate_error(e)
+            if translated is not None:
+                raise translated from e
             raise LLMError(f"{self.provider} request failed: {self._safe_error(e)}") from e
         return replace(response, latency_s=time.perf_counter() - start)
 
@@ -139,6 +147,10 @@ class LLMClient(ABC):
             f"{self.provider} returned invalid JSON for {schema.__name__} after "
             f"{retries + 1} attempt(s): {last_error}"
         )
+
+    def _translate_error(self, e: Exception) -> LLMError | None:
+        """Providers override this to map specific SDK errors to typed LLMError subclasses."""
+        return None
 
     def _safe_error(self, e: Exception) -> str:
         message = f"{type(e).__name__}: {e}"

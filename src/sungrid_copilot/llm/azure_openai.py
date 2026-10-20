@@ -8,7 +8,13 @@ from urllib.parse import parse_qs, urlsplit
 from pydantic import BaseModel, SecretStr
 
 from sungrid_copilot.config import ConfigError, LLMSettings, require_env
-from sungrid_copilot.llm.base import LLMClient, LLMError, LLMResponse, Message
+from sungrid_copilot.llm.base import (
+    LLMClient,
+    LLMContentFilterError,
+    LLMError,
+    LLMResponse,
+    Message,
+)
 
 PROVIDER = "azure_openai"
 DEFAULT_API_VERSION = "2024-02-01"
@@ -51,6 +57,12 @@ class AzureOpenAISettings(BaseModel):
         )
 
 
+def is_input_content_filter(e: Exception) -> bool:
+    """Azure rejects a filtered prompt with HTTP 400 and error code `content_filter`.
+    Duck-typed so it can be tested without the SDK's exception classes."""
+    return getattr(e, "status_code", None) == 400 and getattr(e, "code", None) == "content_filter"
+
+
 def describe_env() -> dict[str, str]:
     """What `check-llm` prints before connecting. Never includes the key or the full URL."""
     raw_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
@@ -90,6 +102,11 @@ class AzureOpenAIClient(LLMClient):
             timeout=llm.timeout_s,
             max_retries=llm.max_retries,
         )
+
+    def _translate_error(self, e: Exception) -> LLMError | None:
+        if is_input_content_filter(e):
+            return LLMContentFilterError("azure_openai rejected the input (content filter).")
+        return None
 
     def _complete(
         self, system: str, messages: list[Message], *, temperature: float, max_tokens: int
