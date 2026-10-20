@@ -44,6 +44,33 @@ class LLMSettings(BaseModel):
         return role_settings.model if role_settings else None
 
 
+class EmbeddingSettings(BaseModel):
+    model: str = "BAAI/bge-small-en-v1.5"
+
+
+class VectorStoreSettings(BaseModel):
+    path: Path = Path(".chroma")
+    collection: str = "sungrid_kb"
+
+    @property
+    def resolved_path(self) -> Path:
+        return _resolve(self.path)
+
+
+class IngestionSettings(BaseModel):
+    docs_dir: Path = Path("docs")
+    manifest: Path = Path("config/doc_manifest.yaml")
+    max_chunk_tokens: int = Field(350, gt=0)
+
+    @property
+    def resolved_docs_dir(self) -> Path:
+        return _resolve(self.docs_dir)
+
+    @property
+    def resolved_manifest(self) -> Path:
+        return _resolve(self.manifest)
+
+
 class RetrievalSettings(BaseModel):
     top_k: int = Field(5, gt=0)
     classifier_min_conf: float = Field(0.6, ge=0, le=1)
@@ -53,7 +80,15 @@ class RetrievalSettings(BaseModel):
 
 class Settings(BaseModel):
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
+    ingestion: IngestionSettings = Field(default_factory=IngestionSettings)
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
+
+
+def _resolve(path: Path) -> Path:
+    """Relative paths in config are relative to the repo root, not the working directory."""
+    return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 def load_env_file(path: Path = DEFAULT_ENV_PATH) -> None:

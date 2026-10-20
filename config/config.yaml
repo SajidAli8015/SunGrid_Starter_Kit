@@ -15,6 +15,18 @@ llm:
     answerer:
       model: null
 
+embedding:
+  model: BAAI/bge-small-en-v1.5   # local fastembed (ONNX); independent of the chat provider
+
+vector_store:
+  path: .chroma                   # relative to the repo root; git-ignored
+  collection: sungrid_kb
+
+ingestion:
+  docs_dir: docs
+  manifest: config/doc_manifest.yaml
+  max_chunk_tokens: 350           # approximate; larger sections split on paragraph/bullet boundaries
+
 retrieval:
   top_k: 5
   classifier_min_conf: 0.6

@@ -1,3 +1,92 @@
 # Per-document metadata: file, title, primary, secondary (list), owner, note.
-# Populated in the ingestion task.
-docs: []
+# Titles come from each file's H1 (without the "SunGrid Cooperative —" prefix).
+# Categories for docs 07-14 are our documented assumption: the kit does not label them.
+# Owners other than the Incentive Program committee and the Billing team (named in the KB)
+# are plausible placeholders.
+docs:
+  - file: 01_program_policies.md
+    title: Member Program Policies
+    primary: program_policies
+    secondary: []
+    owner: Member Services
+    note: ""
+  - file: 02_incentive_rebate_programs.md
+    title: Incentive & Rebate Programs
+    primary: incentive_rebate
+    secondary: []
+    owner: Incentive Program committee
+    note: ""
+  - file: 03_billing_faqs.md
+    title: Billing & Account FAQs
+    primary: billing_account
+    secondary: []
+    owner: Billing team
+    note: ""
+  - file: 04_technical_installation_guidance.md
+    title: Technical & Installation Guidance
+    primary: technical_installation
+    secondary: []
+    owner: Technical Services
+    note: ""
+  - file: 05_company_updates.md
+    title: Company Updates
+    primary: company_updates
+    secondary: []
+    owner: Communications
+    note: ""
+  - file: 06_ambiguous_rebate_billing_adjustments.md
+    title: Rebate Refund & Billing Adjustment Notice
+    primary: incentive_rebate
+    secondary: [billing_account]
+    owner: Incentive Program committee
+    note: >-
+      Reversal determination is made by the Incentive Program committee; the Billing team
+      executes the adjustment schedule. Tagged primary incentive_rebate, secondary billing_account.
+  - file: 07_installer_certification.md
+    title: Installer Certification & Renewal
+    primary: program_policies
+    secondary: []
+    owner: Technical Services
+    note: ""
+  - file: 08_governance_voting.md
+    title: Governance & Voting Rights
+    primary: program_policies
+    secondary: []
+    owner: Board Secretary
+    note: ""
+  - file: 09_battery_storage_incentive.md
+    title: Battery Storage Add-On Incentive
+    primary: incentive_rebate
+    secondary: []
+    owner: Incentive Program committee
+    note: ""
+  - file: 10_low_income_bill_credit.md
+    title: Low-Income Bill Credit Program
+    primary: incentive_rebate
+    secondary: []
+    owner: Incentive Program committee
+    note: ""
+  - file: 11_net_metering_trueup.md
+    title: Net Metering True-Up Details
+    primary: billing_account
+    secondary: []
+    owner: Billing team
+    note: ""
+  - file: 12_autopay_failure_policy.md
+    title: Autopay Failure & Retry Policy
+    primary: billing_account
+    secondary: []
+    owner: Billing team
+    note: ""
+  - file: 13_battery_storage_installation.md
+    title: Battery Storage Installation Requirements
+    primary: technical_installation
+    secondary: []
+    owner: Technical Services
+    note: ""
+  - file: 14_annual_impact_report.md
+    title: Annual Impact Report Summary
+    primary: company_updates
+    secondary: []
+    owner: Communications
+    note: ""

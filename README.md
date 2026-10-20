@@ -30,6 +30,20 @@ offline.
 Providers: `azure_openai`, `openai`, `anthropic`, `gemini`, `fake`. **Only Azure OpenAI is
 tested end to end**; the other clients are written against their SDKs but unverified.
 
+## Build the index and inspect retrieval
+
+```
+python -m sungrid_copilot.cli ingest
+python -m sungrid_copilot.cli search "How long do I have to appeal a rebate decision?"
+python -m sungrid_copilot.cli search "extra charge after my rebate" --category billing_account --top-k 3
+python -m sungrid_copilot.cli search "battery incentive" --json
+```
+
+`ingest` reads `config/doc_manifest.yaml`, chunks each doc in `docs/` by `##` section, embeds
+locally with fastembed (`BAAI/bge-small-en-v1.5`, downloaded on first run, no PyTorch) and
+rebuilds a Chroma index in `.chroma/`. `search` is raw vector search with no LLM call; it fails
+with a clear message if the index is missing or was built with a different embedding model.
+
 ## Tests
 
 ```
