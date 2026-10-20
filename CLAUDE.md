@@ -85,10 +85,26 @@ Retrieval settings in `config.yaml`: `top_k`, `classifier_min_conf`, `non_releva
 - Azure: `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION`.
 - Only Azure is tested end to end. Say so in the README; do not claim the others are verified.
 
+## Member-facing text and escalation
+- All fixed member-facing text lives in `config/messages.yaml` (with `{placeholders}`). Code fills
+  placeholders; it never writes member-facing prose. LLM-written text appears only as grounded answers.
+- Escalation (`escalated=True`, "flagged for human review"): abstained answers, answers the composer marks
+  `needs_human_review` (safety, disputes/appeals, conflicting or incomplete sources), `TIER_NOT_HOUSEHOLD`,
+  `TOOL_ERROR`, too many clarification turns, and any non-content-filter LLM failure. A content-filter
+  rejection is declined without escalation and makes no further LLM calls. An out-of-scope decline is not
+  escalated.
+- After an eligibility decision, LLM "what happens next" text is appended only if `guard.check_final_text`
+  passes on the complete reply; otherwise the deterministic rendering is sent alone.
+
 ## Logging
-One JSONL record per query: timestamp, query, category, confidence, retrieved ids + scores, fallback used,
-tool called, gate verdict, escalated, tokens in/out, latency, estimated cost. This feeds the cost-per-1,000
-number and the monitoring section of the design record.
+One JSONL record per handled message in `logs/queries.jsonl` (git-ignored): timestamp, outcome, category,
+confidence, filter used, fallback reason, retrieved ids + scores, service called, gate verdict, escalated +
+escalation code, guard violations, per-call and total tokens, latency per step, estimated cost. This feeds the
+cost-per-1,000 number and the monitoring section of the design record.
+- Privacy defaults: never log the question text, ZIP, income or any slot value; log a SHA-256 hash of the
+  text and its length. `logging.include_query_text` (default false) adds the text for local debugging only.
+- Agent sessions are in memory only and LLM caches are off for `ask` (`agent.use_llm_cache: false`),
+  because the caches store the member's text.
 
 ## Evaluation
 `eval/questions.yaml` (15-20 questions) + `eval/run_eval.py`. Automated checks: category match, expected

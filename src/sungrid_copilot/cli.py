@@ -9,6 +9,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from sungrid_copilot.agent import AgentResponse, CopilotAgent, Session
 from sungrid_copilot.calibrate import format_summary, load_dev_set, run_calibration, save_report
 from sungrid_copilot.categories import CategoryError, load_categories
 from sungrid_copilot.classify import Classifier
@@ -239,6 +240,57 @@ def run_extract_slots(text: str, use_cache: bool) -> int:
     return 0
 
 
+def _print_response(response: AgentResponse, debug: bool) -> None:
+    print(response.text)
+    if response.escalated:
+        print(f"\nFlagged for human review: {response.escalation_reason}")
+    if not debug:
+        return
+    d = response.details
+    print("\n--- debug ---")
+    print(f"outcome: {response.outcome.value}")
+    for step in response.trace:
+        print(f"  {step.name:<15} {step.ms:>8.1f} ms  {step.summary}")
+    for chunk in d.get("retrieved", []):
+        print(f"  retrieved {chunk['score']:.3f}  {chunk['chunk_id']}")
+    print(
+        f"  service called: {d.get('service_called')}, gate verdict: {d.get('gate_verdict')}, "
+        f"guard violations: {d.get('guard_violations') or 'none'}"
+    )
+    print(
+        f"  LLM calls: {d['llm_call_count']} "
+        f"({', '.join(c['role'] for c in d['llm_calls']) or 'none'}), "
+        f"tokens {d['tokens_in']} in / {d['tokens_out']} out, "
+        f"cost {d['estimated_cost_usd'] if d['estimated_cost_usd'] is not None else 'n/a (no pricing)'}"
+    )
+    print(f"  total latency: {d['latency_ms']:.0f} ms")
+
+
+def run_ask(once: str | None, debug: bool) -> int:
+    """Interactive Copilot session (or a single message with --once)."""
+    try:
+        agent = CopilotAgent.from_settings(load_settings())
+    except (*_ERRORS, MessagesError) as e:
+        print(f"ask failed to start: {e}", file=sys.stderr)
+        return 1
+    session = Session()  # in memory only
+    if once is not None:
+        _print_response(agent.handle(once, session), debug)
+        return 0
+    print("SunGrid Copilot. Type 'exit' to quit.")
+    while True:
+        try:
+            text = input("\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if text.lower() in {"exit", "quit"}:
+            break
+        if text:
+            _print_response(agent.handle(text, session), debug)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Piped output on Windows defaults to the locale code page; always emit UTF-8 instead.
     for stream in (sys.stdout, sys.stderr):
@@ -280,6 +332,10 @@ def main(argv: list[str] | None = None) -> int:
     extract_parser = sub.add_parser("extract-slots", help="Extract eligibility slots (1 LLM call)")
     extract_parser.add_argument("text")
     extract_parser.add_argument("--no-cache", action="store_true")
+
+    ask_parser = sub.add_parser("ask", help="Ask the Copilot (interactive; --once for one message)")
+    ask_parser.add_argument("--once", metavar="QUESTION", help="Handle one message and exit")
+    ask_parser.add_argument("--debug", action="store_true", help="Print the trace and usage")
     args = parser.parse_args(argv)
     if getattr(args, "top_k", None) is not None and args.top_k < 1:
         parser.error("--top-k must be at least 1")
@@ -300,6 +356,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_eligibility_cli(args)
     if args.command == "extract-slots":
         return run_extract_slots(args.text, not args.no_cache)
+    if args.command == "ask":
+        return run_ask(args.once, args.debug)
     return 2
 
 
