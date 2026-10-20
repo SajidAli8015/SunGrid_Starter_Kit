@@ -18,8 +18,8 @@ colleague wrote it, so keep it clean and explainable.
    estimate, no "you would normally get". The LLM must never see `estimated_rebate_usd` unless eligible=True.
 4. No document file names or doc IDs in source code. Doc-specific facts live only in
    `config/doc_manifest.yaml`.
-5. The query category is a retrieval filter, not a router. The only early exit is a *confident*
-   `non_relevant` decline.
+5. The query category is a retrieval filter, not a router. The only early exit is a `non_relevant`
+   decline, and it requires BOTH a confident classifier label AND weak unfiltered retrieval.
 6. Provider-specific code lives only in `src/sungrid_copilot/llm/`. Everything else uses `LLMClient`.
 7. Answers must be grounded in retrieved chunks and cite their sources. If the chunks do not support an
    answer, abstain and say so. Never fill gaps from general knowledge.
@@ -30,16 +30,24 @@ colleague wrote it, so keep it clean and explainable.
 ```
 query
  1. classify -> {category, confidence, needs_eligibility_check}   (1 LLM call, JSON validated by Pydantic)
- 2. category == non_relevant AND confidence >= NON_RELEVANT_MIN_CONF -> polite decline, log, stop
- 3. retrieve top-k, filter: category IN (chunk.primary, chunk.secondary)
-      fallback to UNFILTERED search if classifier confidence < CLASSIFIER_MIN_CONF or best score < MIN_SCORE
-      a low-confidence non_relevant label is treated as "unknown category": search unfiltered
+ 2. retrieve (local and cheap, so always run both searches):
+      unfiltered top-k, and filtered top-k (category IN chunk.primary, chunk.secondary) if in scope
+      use FILTERED when category is in scope AND confidence >= CLASSIFIER_MIN_CONF
+        AND filtered top-1 is within FALLBACK_MARGIN of unfiltered top-1
+      otherwise use UNFILTERED and record the reason: low_classifier_confidence |
+        non_relevant_uncertain | unfiltered_clearly_better (margin exceeded or filtered empty)
+ 3. decline (the only early exit) only if category == non_relevant AND confidence >= NON_RELEVANT_MIN_CONF
+      AND unfiltered top-1 < NON_RELEVANT_SCORE_CEILING -> polite decline, log, stop
  4. needs_eligibility_check -> eligibility flow (below)
     else -> compose grounded answer with citations, or abstain
  5. append one JSONL record to logs/queries.jsonl
 ```
-Categories (snake_case enum): `program_policies`, `incentive_rebate`, `billing_account`,
-`technical_installation`, `company_updates`, `non_relevant`.
+Categories are configuration: `config/categories.yaml` is the single source of truth (snake_case `name`,
+`display_name`, `description`, `examples`). Today: `program_policies`, `incentive_rebate`, `billing_account`,
+`technical_installation`, `company_updates`. `non_relevant` is a built-in reserved query label, never listed
+there and never on a document. Adding a category is a YAML edit plus manifest entries, no code change.
+Retrieval settings in `config.yaml`: `top_k`, `classifier_min_conf`, `non_relevant_min_conf`, `fallback_margin`,
+`non_relevant_score_ceiling` (the last two set from `calibrate` on the dev set, never hard-coded).
 
 ### Eligibility flow
 - Scope: the stub only covers the Rooftop Rebate. For the battery incentive or the low-income credit,
