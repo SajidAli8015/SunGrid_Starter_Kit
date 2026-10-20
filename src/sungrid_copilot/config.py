@@ -96,6 +96,15 @@ class MessagesSettings(BaseModel):
         return _resolve(self.file)
 
 
+class NextStepsSettings(BaseModel):
+    category: str = "incentive_rebate"  # checked against config/categories.yaml by the agent
+    focus: str = (
+        "Explain only the process steps that follow for the member. Do not state any dollar "
+        "amounts, any eligibility result, or whether the member qualifies."
+    )
+    queries: dict[str, str] = Field(default_factory=dict)  # keys: ineligible, eligible
+
+
 class EligibilitySettings(BaseModel):
     # The service is loaded by name so no code depends on where the stub lives.
     service_module: str = "stub_tools"
@@ -103,10 +112,34 @@ class EligibilitySettings(BaseModel):
     timeout_s: float = Field(5, gt=0)
     extractor_max_tokens: int = Field(200, gt=0)
     cache_dir: Path = Path(".cache/extract")
+    next_steps: NextStepsSettings = Field(default_factory=NextStepsSettings)
 
     @property
     def resolved_cache_dir(self) -> Path:
         return _resolve(self.cache_dir)
+
+
+class AnswerSettings(BaseModel):
+    max_tokens: int = Field(600, gt=0)
+
+
+class AgentSettings(BaseModel):
+    max_clarification_turns: int = Field(3, ge=1)
+    use_llm_cache: bool = False
+
+
+class LoggingSettings(BaseModel):
+    path: Path = Path("logs/queries.jsonl")
+    include_query_text: bool = False
+
+    @property
+    def resolved_path(self) -> Path:
+        return _resolve(self.path)
+
+
+class ModelPrice(BaseModel):
+    input_per_1m: float | None = Field(None, ge=0)
+    output_per_1m: float | None = Field(None, ge=0)
 
 
 class RetrievalSettings(BaseModel):
@@ -129,6 +162,11 @@ class Settings(BaseModel):
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
     messages: MessagesSettings = Field(default_factory=MessagesSettings)
     eligibility: EligibilitySettings = Field(default_factory=EligibilitySettings)
+    answer: AnswerSettings = Field(default_factory=AnswerSettings)
+    agent: AgentSettings = Field(default_factory=AgentSettings)
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    # provider -> model/deployment -> price per 1M tokens
+    pricing: dict[str, dict[str, ModelPrice]] = Field(default_factory=dict)
 
 
 def _resolve(path: Path) -> Path:

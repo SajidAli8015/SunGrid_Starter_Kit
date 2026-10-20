@@ -52,3 +52,22 @@ tiers:
   community: Community-tier
   household: Household-tier
   commercial: Commercial-tier
+
+# --- Agent -----------------------------------------------------------------------------------------
+out_of_scope: >-
+  Sorry, I can only help with questions about SunGrid Cooperative: membership, billing, rebates and
+  incentives, solar installation and company updates.
+content_filter: >-
+  Sorry, I can't process that request. If you have a question about your SunGrid membership, billing,
+  rebates, installation or company news, please ask it in your own words.
+temporarily_unavailable: >-
+  Sorry, I couldn't process your request right now. It has been flagged for a member-support
+  specialist; please try again shortly.
+abstain: >-
+  I don't have enough information in the SunGrid knowledge base to answer this reliably, so I won't
+  guess. Your question has been flagged for a member-support specialist.
+escalation_notice: "This answer has been flagged for review by a member-support specialist: {reason}"
+too_many_clarifications: >-
+  I still don't have the details needed for the Rooftop Rebate pre-check, so I've flagged your
+  question for a member-support specialist who can help you directly.
+sources_header: "Sources:"

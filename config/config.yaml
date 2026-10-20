@@ -52,3 +52,31 @@ eligibility:
   timeout_s: 5                    # single attempt, no retries
   extractor_max_tokens: 200
   cache_dir: .cache/extract       # git-ignored slot-extraction cache
+  # After a decision, the KB is searched for what happens next. Plain questions, not doc names.
+  next_steps:
+    category: incentive_rebate
+    focus: >-
+      Explain only the process steps that follow for the member. Do not state any dollar amounts,
+      any eligibility result, or whether the member qualifies.
+    queries:
+      ineligible: How can a member appeal a rebate eligibility determination, and within what time limit?
+      eligible: What documents must a Rooftop Rebate applicant submit, and what happens when the program budget runs out?
+
+answer:
+  max_tokens: 600
+
+agent:
+  max_clarification_turns: 3
+  # LLM caches store the member's text on disk; they are for tuning commands, not member sessions.
+  use_llm_cache: false
+
+logging:
+  path: logs/queries.jsonl        # git-ignored; one JSON line per handled message
+  include_query_text: false       # privacy default: log a SHA-256 hash and the length only
+
+# USD per 1M tokens, keyed by provider then model/deployment. null = unknown, so cost is null.
+pricing:
+  azure_openai:
+    gpt-4o:
+      input_per_1m: null
+      output_per_1m: null
