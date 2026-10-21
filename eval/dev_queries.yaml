@@ -77,6 +77,12 @@ queries:
     expected_sources: [07_installer_certification, 02_incentive_rebate_programs]
     expect_eligibility_check: true
     tags: [eligibility, installer, lapse, mixed]
+  - id: d30  # added after a live check (F1 follow-up): a lapse whose timing relative to the install is not stated
+    query: Do I qualify for the rooftop rebate? The installer was approved, but their certification lapsed sometime last year.
+    expected_category: incentive_rebate
+    expected_sources: [07_installer_certification, 02_incentive_rebate_programs]
+    expect_eligibility_check: true
+    tags: [eligibility, installer, lapse, timing_unstated]
 
   # --- technical_installation ------------------------------------------------------------
   - id: d12

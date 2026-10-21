@@ -40,7 +40,8 @@ class EligibilitySlots(BaseModel):
         strict=True,  # never coerce "yes"/"no"/1 to a bool
         description="The installer was on SunGrid's approved installer list at the time of "
         "installation, with the certification of the electrician who did the work current. "
-        "false for a lapse during the installation; null if unclear.",
+        "false only if not on the list or a lapse overlapped the installation; null if a lapse's "
+        "timing is not stated or anything is unclear.",
     )
     member_tier: MemberTier | None = Field(None, description="Membership tier if stated.")
 
@@ -83,11 +84,14 @@ Rules:
 3. installer_approved:
    - true only if the member clearly says the installer is or was SunGrid-approved (on SunGrid's
      approved installer list) and says nothing suggesting the approval or certification lapsed.
-   - false if they say the installer is or was not SunGrid-approved, or mention that the installer's
-     or electrician's certification lapsed or expired at any time during the installation.
+   - false only if the member says the installer is or was not on SunGrid's approved list, or says
+     a lapse overlapped the installation (the certification was lapsed or expired while the work was
+     being done).
+   - null if a lapse is mentioned but the member does not say whether it overlapped the installation
+     (for example "it lapsed at some point"); the clarifying question will settle it.
    - null for anything weaker: "I think so", "probably", "not sure", a certification or licence that
      is not SunGrid approval (for example a state electrical licence or a manufacturer certification),
-     a lapse whose timing relative to the installation is unclear, or no mention at all.
+     or no mention at all.
 4. household_zip stays a string exactly as written. system_size_kw is in kW.
 5. member_tier only if they state their tier (for example "I'm a household member").
 6. If the member was asked for specific details, a short reply (for example "yes" or a bare number)

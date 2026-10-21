@@ -102,3 +102,26 @@ def test_installer_definition_matches_the_clarifying_question():
     assert "electrician who did the work" in system
     assert "lapse" in system and "false" in system  # a lapse during the install is false
     assert "null for anything weaker" in system
+
+
+# Found in a live check (gpt-4o): this phrasing came back false although the timing of the lapse
+# relative to the installation is not stated. The rule must make it null so the question is asked.
+LAPSE_TIMING_UNSTATED = "The installer was approved, but their certification lapsed sometime last year."
+
+
+def test_lapse_with_unstated_timing_is_unknown_and_asked():
+    from sungrid_copilot.config import load_settings
+    from sungrid_copilot.eligibility.questions import build_clarifying_question
+    from sungrid_copilot.messages import Messages
+
+    client = FakeLLMClient(default=json.dumps({"installer_approved": None}))
+    slots = SlotExtractor(client).extract(LAPSE_TIMING_UNSTATED)
+    system = client.calls[0].system
+    rule = " ".join(system.split("3. installer_approved:")[1].split("\n4.")[0].split())
+    assert "false only if" in rule and "a lapse overlapped the installation" in rule
+    assert "null if a lapse is mentioned but the member does not say whether it overlapped" in rule
+
+    messages = Messages.load(load_settings().messages.resolved_file)
+    assert slots.installer_approved is None
+    question = build_clarifying_question(slots.missing(), messages)
+    assert messages.text("q_installer_approved") in question
