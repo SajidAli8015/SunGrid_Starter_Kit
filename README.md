@@ -150,8 +150,8 @@ import each other.
   teams the documents name) are placeholders.
 - Doc 06 (rebate refund and billing adjustment) is tagged primary `incentive_rebate`, secondary
   `billing_account`: the Incentive Program committee makes the reversal determination and the Billing team
-  executes the schedule, so billing-worded questions must still find it.
-  TODO: link `submission/ambiguity_note.md` once written.
+  executes the schedule, so billing-worded questions must still find it. See
+  [submission/ambiguity_note.md](submission/ambiguity_note.md).
 - The eligibility service belongs to another team. `stub_tools.py` is unchanged and is called only through
   `eligibility/adapter.py`; its logic is not reimplemented.
 - The service covers only the Rooftop Rebate. Battery Storage Add-On and Low-Income Bill Credit questions are
@@ -166,7 +166,10 @@ import each other.
 ## Known limitations
 
 - The eligibility service is called once with a timeout and no retries; failures escalate to a person.
-- The output guard catches `$500`, `USD 500` and `500 dollars`, but not amounts written in words.
+- The output guard catches `$500`, `USD 500` and `500 dollars` anywhere in the reply. In the LLM-written part of
+  a non-eligible reply it also flags bare amounts such as `4,000`, `4000`, `3k` and `40 cents per watt`. That
+  check fails safe: a year or a 3-digit figure in the next-steps text drops that text. Amounts written in words
+  ("three thousand dollars") are not caught.
 - Classifier confidence is self-reported by the LLM and uncalibrated; it only widens search, except in the
   guarded decline.
 - Known wrong answer: "Can a Community-tier member run for the board?" is answered with a flat "no" that the

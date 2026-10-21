@@ -106,7 +106,7 @@ cost-per-1,000 number and the monitoring section of the design record.
   because the caches store the member's text.
 
 ## Evaluation
-`eval/questions.yaml` (15-20 questions) + `eval/run_eval.py`. Automated checks: category match, expected
+`eval/questions.yaml` (15-20 questions) + `python -m sungrid_copilot.cli eval`. Automated checks: category match, expected
 source in top-k, tool called or not, gate outcome, must-not-contain. Answer quality is hand-graded from a
 generated CSV. Report counts (for example 15/18), not percentages. Failures are included, never hidden.
 
