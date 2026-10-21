@@ -5,6 +5,7 @@ import json
 import pytest
 
 from agent_helpers import (
+    DOCS,
     EMPTY_SLOTS,
     FULL_SLOTS,
     MESSAGES,
@@ -194,6 +195,27 @@ def test_wrong_amount_in_eligible_reply_is_dropped(kb, tmp_path):
     assert r.outcome is Outcome.ELIGIBLE_PRELIMINARY
     assert "$4,000.00" not in r.text and "$3,000.00" in r.text
     assert r.details["guard_violations"] == ["amount other than the service's $3,000.00: $4,000.00"]
+
+
+RATE_DOCS = {
+    **DOCS,
+    "rebate.md": DOCS["rebate.md"]
+    + "## Rates\nThe Rooftop Rebate is $0.40 per watt, capped at $4,000 per household.\n",
+}
+
+
+def test_program_rate_restated_without_dollar_sign_is_dropped_for_ineligible(tmp_path):
+    rate_kb = build_kb(tmp_path / "rate_kb", docs=RATE_DOCS)
+    text = "do I qualify with 130k income?"
+    slots = json.dumps({**FULL_SLOTS, "annual_income_usd": 130000})
+    restated = answer("You can appeal within 30 days. The rebate is 40 cents per watt, up to 4,000 per household.")
+    composer = FakeLLMClient(default=restated)
+    h = _eligibility_harness(rate_kb, tmp_path, {text: slots}, composer)
+    r = h.ask(text)
+    assert "0.40 per watt" in composer.calls[0].messages[0]["content"]  # the rate chunk was in context
+    assert r.outcome is Outcome.INELIGIBLE
+    assert r.text == MESSAGES.text("ineligible", reason="Household income exceeds the regional threshold.")
+    assert r.details["guard_violations"]
 
 
 AMOUNT_FOLLOW_UP = "How much is the rooftop rebate for a 7.5 kW system?"

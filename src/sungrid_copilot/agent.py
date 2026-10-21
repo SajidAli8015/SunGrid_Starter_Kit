@@ -346,7 +346,7 @@ class CopilotAgent:
 
         candidate = self._with_sources(f"{deterministic}\n\n{answer.text}", answer.source_labels)
         with self._step(run, "guard") as step:
-            violations = check_final_text(candidate, outcome, self.messages)
+            violations = check_final_text(candidate, outcome, self.messages, llm_text=answer.text)
             step.summary = f"violations: {violations}" if violations else "ok"
         run.log["guard_violations"] = violations
         if violations:

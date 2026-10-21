@@ -75,11 +75,11 @@ class Spy:
         return stub_tools.check_rebate_eligibility(**kwargs)
 
 
-def build_kb(root):
+def build_kb(root, docs=None):
     """Temp KB (hash embedder) and settings shared by the agent and eval tests."""
     manifest, docs_dir = write_kb(
         root,
-        DOCS,
+        docs or DOCS,
         [
             entry("rebate.md", "incentive_rebate"),
             entry("faults.md", "technical_installation"),

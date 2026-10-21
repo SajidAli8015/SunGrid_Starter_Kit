@@ -10,7 +10,7 @@ from sungrid_copilot.config import load_settings
 from sungrid_copilot.eligibility.adapter import EligibilityAdapter, InvalidInput, ToolError
 from sungrid_copilot.eligibility.flow import Decision, NeedsInfo, TierNotHousehold, run_eligibility
 from sungrid_copilot.eligibility.gate import GateDecision, Verdict
-from sungrid_copilot.eligibility.guard import check_final_text
+from sungrid_copilot.eligibility.guard import check_final_text, find_numbers
 from sungrid_copilot.eligibility.render import load_messages, render
 from sungrid_copilot.eligibility.slots import EligibilitySlots
 
@@ -127,6 +127,48 @@ def test_guard_flags_amount_in_ineligible_reply():
 )
 def test_guard_flags_any_amount_for_non_decisions(outcome):
     assert check_final_text(render(outcome, MESSAGES) + " Up to $4,000.", outcome, MESSAGES)
+
+
+INELIGIBLE = Decision(GateDecision(Verdict.INELIGIBLE, reason="Household income exceeds the regional threshold."))
+
+
+@pytest.mark.parametrize(
+    "llm_text",
+    [
+        "Households normally get up to 4,000 for a system like this.",
+        "The cap is 4000 per household.",
+        "The rebate is 40 cents per watt.",
+        "It pays 0.40 per watt.",
+        "You would have received about 3k.",
+    ],
+)
+def test_guard_flags_numbers_in_the_llm_part_of_a_non_eligible_reply(llm_text):
+    text = f"{render(INELIGIBLE, MESSAGES)}\n\n{llm_text}"
+    assert check_final_text(text, INELIGIBLE, MESSAGES, llm_text=llm_text)
+
+
+def test_guard_allows_ordinary_numbers_in_the_llm_part():
+    llm_text = "You can appeal within 30 days; incomplete applications are held for 15 business days."
+    text = f"{render(INELIGIBLE, MESSAGES)}\n\n{llm_text}"
+    assert check_final_text(text, INELIGIBLE, MESSAGES, llm_text=llm_text) == []
+
+
+def test_deterministic_ineligible_text_never_trips_the_guard():
+    """Every reason the real service can give, rendered, passes (with and without an LLM part)."""
+    import stub_tools
+
+    base = dict(household_zip="94101", annual_income_usd=85000.0, system_size_kw=7.5,
+                installer_approved=True)
+    failing = [{"installer_approved": False}, {"household_zip": "10001"},
+               {"annual_income_usd": 150000.0}, {"system_size_kw": 12.0}]
+    for change in failing:
+        raw = stub_tools.check_rebate_eligibility(**{**base, **change})
+        outcome = Decision(GateDecision(Verdict.INELIGIBLE, reason=raw["reason"]))
+        text = render(outcome, MESSAGES)
+        assert check_final_text(text, outcome, MESSAGES) == [], raw["reason"]
+        assert find_numbers(text) == [], raw["reason"]  # even "3kW-10kW" is not a match
+        clean = "You can appeal within 30 days."
+        assert check_final_text(f"{text}\n\n{clean}", outcome, MESSAGES, llm_text=clean) == []
 
 
 def test_guard_flags_wrong_amount_and_missing_caveat_in_eligible_reply():
