@@ -6,8 +6,7 @@ answers SunGrid member questions from 14 synthetic knowledge-base documents (RAG
 eligibility service (`stub_tools.py`) for rooftop-rebate eligibility questions.
 
 Part of the grade is judgement. Simple, correct, tested and honestly evaluated beats clever.
-Do not gold-plate. The repo will be read by reviewers, and the author will later review it as if a junior
-colleague wrote it, so keep it clean and explainable.
+Do not gold-plate. The repo will be read and reviewed by others, so keep it clean and explainable.
 
 ## Hard rules (never violate)
 1. Never edit `stub_tools.py`. Call it only through `eligibility/adapter.py`.
