@@ -105,8 +105,11 @@ def test_real_dev_set_is_valid():
         settings.ingestion.resolved_manifest, settings.ingestion.resolved_docs_dir, CATEGORIES
     )
     queries = load_dev_set(DEFAULT_DEV_SET, CATEGORIES, {e.doc_id for e in entries})
-    assert len(queries) == 28
-    assert sum(q.in_scope for q in queries) == 20
+    assert len(queries) == 29
+    assert sum(q.in_scope for q in queries) == 21
+    # F1: a mixed eligibility question whose installer certification lapsed during the install.
+    assert any(q.expect_eligibility_check and "installer" in q.tags and "lapse" in q.query.lower()
+               for q in queries)
     for name in CATEGORIES.names:
         assert sum(q.expected_category == name for q in queries) >= 3
 

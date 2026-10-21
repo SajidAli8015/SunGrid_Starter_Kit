@@ -86,3 +86,19 @@ def test_extraction_cache(tmp_path):
     first = SlotExtractor(client, cache_dir=tmp_path).extract("text")
     second = SlotExtractor(client, cache_dir=tmp_path).extract("text")
     assert first == second and len(client.calls) == 1
+
+
+def test_installer_definition_matches_the_clarifying_question():
+    """The extractor must use the same installer test as the question it replaces (F1)."""
+    from sungrid_copilot.config import load_settings
+    from sungrid_copilot.messages import Messages
+
+    question = Messages.load(load_settings().messages.resolved_file).text("q_installer_approved")
+    client = FakeLLMClient(default=FULL_JSON)
+    SlotExtractor(client).extract("do I qualify?")
+    system = client.calls[0].system.lower()
+    for phrase in ("approved installer list", "at the time of installation"):
+        assert phrase in question.lower() and phrase in system, phrase
+    assert "electrician who did the work" in system
+    assert "lapse" in system and "false" in system  # a lapse during the install is false
+    assert "null for anything weaker" in system

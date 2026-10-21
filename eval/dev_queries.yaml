@@ -71,6 +71,12 @@ queries:
     expected_sources: [09_battery_storage_incentive]
     expect_eligibility_check: false
     tags: [battery, not_rooftop_rebate]
+  - id: d29  # added after the review of 6619e93 (F1): eligibility question with a lapse during the install
+    query: Am I eligible for the rooftop rebate? Household tier, ZIP 94103, about $85k a year, 6 kW. The installer company is SunGrid-approved, but the electrician's certification had lapsed when they did our install.
+    expected_category: incentive_rebate
+    expected_sources: [07_installer_certification, 02_incentive_rebate_programs]
+    expect_eligibility_check: true
+    tags: [eligibility, installer, lapse, mixed]
 
   # --- technical_installation ------------------------------------------------------------
   - id: d12

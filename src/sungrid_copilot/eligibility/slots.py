@@ -38,7 +38,9 @@ class EligibilitySlots(BaseModel):
     installer_approved: bool | None = Field(
         None,
         strict=True,  # never coerce "yes"/"no"/1 to a bool
-        description="true/false only if the member clearly says so; otherwise null.",
+        description="The installer was on SunGrid's approved installer list at the time of "
+        "installation, with the certification of the electrician who did the work current. "
+        "false for a lapse during the installation; null if unclear.",
     )
     member_tier: MemberTier | None = Field(None, description="Membership tier if stated.")
 
@@ -70,16 +72,22 @@ Fields:
 - household_zip: the home's ZIP code, as a string exactly as written.
 - annual_income_usd: annual household income in US dollars.
 - system_size_kw: rooftop solar system size in kW, as a number.
-- installer_approved: whether the installer is SunGrid-approved or certified.
+- installer_approved: whether the installer was on SunGrid's approved installer list at the time of
+  installation, with the SunGrid certification of the electrician who did the work current (not lapsed).
 - member_tier: "community", "household" or "commercial".
 
 Rules:
 1. Extract ONLY values the member explicitly states. Never infer, assume or default. Unknown means null.
 2. annual_income_usd only if an annual amount is clearly given ("$85k a year" is 85000). A monthly
    figure, or one whose period is unclear, is null.
-3. installer_approved is true only if the member clearly says the installer is SunGrid-approved or
-   certified, false only if they clearly say it is not, and null for "I think so", "probably",
-   "not sure" or if they do not mention it.
+3. installer_approved:
+   - true only if the member clearly says the installer is or was SunGrid-approved (on SunGrid's
+     approved installer list) and says nothing suggesting the approval or certification lapsed.
+   - false if they say the installer is or was not SunGrid-approved, or mention that the installer's
+     or electrician's certification lapsed or expired at any time during the installation.
+   - null for anything weaker: "I think so", "probably", "not sure", a certification or licence that
+     is not SunGrid approval (for example a state electrical licence or a manufacturer certification),
+     a lapse whose timing relative to the installation is unclear, or no mention at all.
 4. household_zip stays a string exactly as written. system_size_kw is in kW.
 5. member_tier only if they state their tier (for example "I'm a household member").
 6. If the member was asked for specific details, a short reply (for example "yes" or a bare number)

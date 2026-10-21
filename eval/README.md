@@ -5,7 +5,7 @@
 | File | Purpose |
 |---|---|
 | `questions.yaml` | Held-out evaluation set: 20 questions (fixed content, not edited). |
-| `dev_queries.yaml` | Development set (28 queries) used only for `calibrate`; never scored here. |
+| `dev_queries.yaml` | Development set (29 queries) used only for `calibrate`; never scored here. |
 | `RUBRIC.md` | One-page rubric for hand grading. |
 | `results/` | Run folders (git-ignored). |
 
