@@ -14,7 +14,8 @@ dist/
 .chroma/
 logs/
 eval/results/
+.cache/
 
+# Local-only material (assessment brief and working prompts)
 prompt/
 Assessment*.pdf
-.cache/
