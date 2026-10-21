@@ -26,7 +26,7 @@ from sungrid_copilot.eligibility.flow import (
     run_eligibility,
 )
 from sungrid_copilot.eligibility.gate import Verdict
-from sungrid_copilot.eligibility.guard import check_final_text
+from sungrid_copilot.eligibility.guard import check_final_text, find_money
 from sungrid_copilot.eligibility.render import load_messages, render
 from sungrid_copilot.eligibility.slots import SLOT_ORDER, EligibilitySlots, SlotExtractor
 from sungrid_copilot.llm import LLMContentFilterError, LLMError, get_llm_client
@@ -87,6 +87,9 @@ class Session:
     slots: EligibilitySlots = field(default_factory=EligibilitySlots)
     pending_eligibility: bool = False
     clarification_turns: int = 0
+    # The last eligibility verdict in this session: later knowledge answers must not hand an
+    # ineligible (or non-household) member an amount the hard gate withheld.
+    last_verdict: Outcome | None = None
 
     def finish_eligibility(self) -> None:
         self.pending_eligibility = False
@@ -225,11 +228,13 @@ class CopilotAgent:
                 session.slots = self.extractor.extract(text, prior=session.slots, use_cache=self.use_cache)
                 step.summary = f"missing: {session.slots.missing() or 'none'}"
             return self._eligibility(session, run)
-        return self._answer(text, retrieved, run)
+        return self._answer(text, retrieved, session, run)
 
     # ------------------------------------------------------------------ knowledge answers
 
-    def _answer(self, question: str, retrieved: RetrievalResult, run: _Run) -> AgentResponse:
+    def _answer(
+        self, question: str, retrieved: RetrievalResult, session: Session, run: _Run
+    ) -> AgentResponse:
         with self._step(run, "compose_answer") as step:
             answer = self.composer.compose(question, retrieved.hits)
             step.summary = _answer_summary(answer)
@@ -242,6 +247,17 @@ class CopilotAgent:
                 escalate="abstained",
                 detail=answer.problem or answer.review_reason,
             )
+        if session.last_verdict in (Outcome.INELIGIBLE, Outcome.TIER_NOT_HOUSEHOLD):
+            # Same rule as the hard gate, one turn later: no amount for a member who was refused.
+            found = find_money(answer.text)
+            run.log["guard_violations"] = [f"amount after a non-eligible verdict: {m}" for m in found]
+            if found:
+                return self._reply(
+                    run,
+                    Outcome.ABSTAINED,
+                    self.messages.text("abstain"),
+                    escalate="amount_after_non_eligible_verdict",
+                )
         body = answer.text
         if answer.needs_human_review:
             reason = answer.review_reason or "flagged by the answer step"
@@ -282,6 +298,11 @@ class CopilotAgent:
             return self._reply(run, Outcome.INVALID_INPUT, deterministic)
 
         session.finish_eligibility()
+        if isinstance(outcome, TierNotHousehold):
+            session.last_verdict = Outcome.TIER_NOT_HOUSEHOLD
+        elif isinstance(outcome, Decision):
+            eligible = outcome.decision.verdict is Verdict.ELIGIBLE_PRELIMINARY
+            session.last_verdict = Outcome.ELIGIBLE_PRELIMINARY if eligible else Outcome.INELIGIBLE
         if isinstance(outcome, TierNotHousehold):
             return self._reply(
                 run, Outcome.TIER_NOT_HOUSEHOLD, deterministic, escalate="tier_not_household"

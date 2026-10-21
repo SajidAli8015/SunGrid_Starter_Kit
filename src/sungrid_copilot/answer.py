@@ -34,8 +34,9 @@ Rules:
    Say so; never invent dates.
 6. If arithmetic is needed from the sources, show the working step by step and state the cap if one
    applies.
-7. Do not compute or state a member-specific Rooftop Rebate amount; only the eligibility service
-   does that.
+7. Do not compute or state a Rooftop Rebate amount for a specific member or a specific system size
+   (for example "a 7.5 kW system"); only the eligibility service does that. You may state the
+   published rate and cap.
 8. Set needs_human_review=true for safety-related answers (for example a fault code that requires an
    inspection), for disputes or appeals, for conflicting or incomplete sources, and whenever
    supported=false. Give review_reason as one short phrase when needs_human_review is true.

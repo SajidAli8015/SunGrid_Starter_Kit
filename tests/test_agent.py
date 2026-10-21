@@ -196,6 +196,48 @@ def test_wrong_amount_in_eligible_reply_is_dropped(kb, tmp_path):
     assert r.details["guard_violations"] == ["amount other than the service's $3,000.00: $4,000.00"]
 
 
+AMOUNT_FOLLOW_UP = "How much is the rooftop rebate for a 7.5 kW system?"
+COMPUTED = answer("7,500 W x $0.40 per watt = $3,000, under the $4,000 cap.")
+
+
+def _follow_up_harness(kb, tmp_path, first, first_slots):
+    """Turn 1 is an eligibility question; turn 2 is a general question the composer answers with an amount."""
+    classifier = FakeLLMClient({
+        q(first): label("incentive_rebate", 0.95, True),
+        q(AMOUNT_FOLLOW_UP): label("incentive_rebate", 0.9, False),
+    })
+    extractor = FakeLLMClient({m(first): first_slots})
+    composer = FakeLLMClient({q(AMOUNT_FOLLOW_UP): COMPUTED}, default=answer("Appeal within 30 days."))
+    return harness(kb, tmp_path, classifier=classifier, extractor=extractor, composer=composer)
+
+
+@pytest.mark.parametrize(
+    "first, slots, verdict",
+    [
+        ("do I qualify? 130k income", json.dumps({**FULL_SLOTS, "annual_income_usd": 130000}),
+         Outcome.INELIGIBLE),
+        ("I'm a Community member, do I qualify?", json.dumps({"member_tier": "community"}),
+         Outcome.TIER_NOT_HOUSEHOLD),
+    ],
+    ids=["ineligible", "tier_not_household"],
+)
+def test_amount_in_knowledge_answer_after_non_eligible_verdict_abstains(kb, tmp_path, first, slots, verdict):
+    h = _follow_up_harness(kb, tmp_path, first, slots)
+    assert h.ask(first).outcome is verdict
+    r = h.ask(AMOUNT_FOLLOW_UP)
+    assert r.outcome is Outcome.ABSTAINED and r.escalated
+    assert r.text == MESSAGES.text("abstain") and r.sources == []
+    assert "$" not in r.text
+    assert r.details["escalation_code"] == "amount_after_non_eligible_verdict"
+    assert r.details["guard_violations"]
+
+
+def test_amount_in_knowledge_answer_without_a_non_eligible_verdict_is_kept(kb, tmp_path):
+    h = _follow_up_harness(kb, tmp_path, "unused", EMPTY_SLOTS)
+    r = h.ask(AMOUNT_FOLLOW_UP)
+    assert r.outcome is Outcome.ANSWERED and "$3,000" in r.text
+
+
 class MisbehavingExtractor:
     """Returns slots that bypass validation, as a buggy extractor might."""
 
