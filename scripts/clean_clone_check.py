@@ -72,6 +72,10 @@ def _remove(path: Path) -> None:
 
 
 def main() -> int:
+    # Child output (e.g. download progress bars) may not fit the console code page.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--keep", action="store_true", help="Keep the temporary folder")
     parser.add_argument(
