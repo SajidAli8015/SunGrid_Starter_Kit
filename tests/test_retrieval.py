@@ -146,3 +146,20 @@ def test_with_settings_changes_margin():
 def test_should_decline_needs_both_signals(label, unfiltered_top, expected):
     r = _retriever({None: [_hit("a", unfiltered_top)]})
     assert r.should_decline(label, r.retrieve("q", label)) is expected
+
+
+def test_query_embedding_cache_is_a_bounded_lru():
+    """Member queries must not pile up in memory for the life of the agent (F8)."""
+    from sungrid_copilot.retrieval import EMBEDDING_CACHE_SIZE
+
+    r = _retriever({None: [_hit("a", 0.8)]})
+    assert 100 <= EMBEDDING_CACHE_SIZE <= 1000
+    for i in range(EMBEDDING_CACHE_SIZE + 50):
+        r.retrieve(f"query {i}", _label("billing_account"))
+    assert len(r._embeddings) == EMBEDDING_CACHE_SIZE
+    assert "query 0" not in r._embeddings and f"query {EMBEDDING_CACHE_SIZE + 49}" in r._embeddings
+
+    oldest = next(iter(r._embeddings))
+    r.retrieve(oldest, _label("billing_account"))  # a hit refreshes the entry
+    r.retrieve("one more", _label("billing_account"))
+    assert oldest in r._embeddings and len(r._embeddings) == EMBEDDING_CACHE_SIZE

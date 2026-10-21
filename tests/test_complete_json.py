@@ -64,3 +64,15 @@ def test_provider_exception_is_wrapped_and_redacted():
         client.complete("system", MESSAGES)
     assert "sk-abc123" not in str(excinfo.value)
     assert "RuntimeError" in str(excinfo.value)
+
+
+def test_final_failure_message_has_no_input_values():
+    """Validation errors name the field and the problem, never what the model sent (F8)."""
+    client = FakeLLMClient(['{"category": "94103", "confidence": "85000 a year"}'] * 2)
+    with pytest.raises(LLMError) as excinfo:
+        client.complete_json("system", MESSAGES, Label, retries=1)
+    message = str(excinfo.value)
+    assert "confidence" in message
+    assert "94103" not in message and "85000" not in message
+    retry = client.calls[1].messages[-1]["content"]
+    assert "confidence" in retry and "85000" not in retry

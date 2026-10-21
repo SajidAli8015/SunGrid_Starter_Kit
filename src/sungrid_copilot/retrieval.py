@@ -7,6 +7,7 @@ does not cost much similarity versus searching everything.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 
 from sungrid_copilot.categories import NON_RELEVANT, CategorySet, load_categories
@@ -18,6 +19,9 @@ from sungrid_copilot.kb.store import ChromaVectorStore, SearchHit, VectorStore
 LOW_CLASSIFIER_CONFIDENCE = "low_classifier_confidence"
 NON_RELEVANT_UNCERTAIN = "non_relevant_uncertain"
 UNFILTERED_CLEARLY_BETTER = "unfiltered_clearly_better"
+# Query embeddings are cached (calibration re-runs the same queries). The keys are member text, so
+# the cache is a small LRU rather than growing for the life of the agent.
+EMBEDDING_CACHE_SIZE = 256
 
 
 @dataclass(frozen=True)
@@ -42,7 +46,7 @@ class Retriever:
         self.embedder = embedder
         self.categories = categories
         self.settings = settings
-        self._embeddings: dict[str, list[float]] = {}  # calibration re-runs the same queries
+        self._embeddings: OrderedDict[str, list[float]] = OrderedDict()  # bounded LRU
 
     @classmethod
     def from_settings(cls, settings: Settings, embedder: Embedder | None = None) -> Retriever:
@@ -122,6 +126,11 @@ class Retriever:
         )
 
     def _embed(self, query: str) -> list[float]:
-        if query not in self._embeddings:
-            self._embeddings[query] = self.embedder.embed_query(query)
-        return self._embeddings[query]
+        if query in self._embeddings:
+            self._embeddings.move_to_end(query)
+            return self._embeddings[query]
+        embedding = self.embedder.embed_query(query)
+        self._embeddings[query] = embedding
+        while len(self._embeddings) > EMBEDDING_CACHE_SIZE:
+            self._embeddings.popitem(last=False)
+        return embedding

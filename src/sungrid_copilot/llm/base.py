@@ -134,7 +134,7 @@ class LLMClient(ABC):
                 value = schema.model_validate_json(strip_code_fences(response.text))
                 return JSONResponse(value=value, responses=responses)
             except ValidationError as e:
-                last_error = str(e)[:_MAX_ERROR_CHARS]
+                last_error = _describe_validation_error(e)
                 conversation += [
                     {"role": "assistant", "content": response.text},
                     {
@@ -157,6 +157,16 @@ class LLMClient(ABC):
         for secret in self._secrets:
             message = message.replace(secret, "***")
         return message[:_MAX_ERROR_CHARS]
+
+
+def _describe_validation_error(e: ValidationError) -> str:
+    """Field and problem for each error, without the offending values: `str(e)` would include
+    them, and for slot extraction those are the member's ZIP or income."""
+    parts = [
+        f"{'.'.join(str(p) for p in err['loc']) or '(root)'}: {err['msg']}"
+        for err in e.errors(include_input=False, include_url=False)
+    ]
+    return "; ".join(parts)[:_MAX_ERROR_CHARS]
 
 
 def strip_code_fences(text: str) -> str:
