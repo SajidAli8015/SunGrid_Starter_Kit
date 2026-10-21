@@ -138,6 +138,33 @@ def test_generic_llm_error_is_unavailable_and_escalated(kb, tmp_path):
     assert h.spy.calls == [] and h.composer_llm.calls == []
 
 
+def test_unexpected_error_is_unavailable_escalated_and_logged(kb, tmp_path, monkeypatch):
+    text = "How are monthly bill charges explained? My ZIP is 94103."
+    h = harness(kb, tmp_path, classifier=FakeLLMClient({q(text): label("billing_account")}))
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("index exploded near 94103")
+
+    monkeypatch.setattr(h.agent.retriever, "retrieve", broken)
+    r = h.ask(text)
+    assert r.outcome is Outcome.SERVICE_UNAVAILABLE and r.escalated
+    assert r.text == MESSAGES.text("temporarily_unavailable")
+    assert r.escalation_reason == "internal_error: RuntimeError"
+    [record] = h.log_records()
+    assert record["escalation_code"] == "internal_error"
+    assert "94103" not in json.dumps(record) and "exploded" not in json.dumps(record)
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\n\t"])
+def test_blank_message_is_rejected_before_classifying(kb, tmp_path, blank):
+    h = harness(kb, tmp_path)
+    r = h.ask(blank)
+    assert r.outcome is Outcome.EMPTY_MESSAGE and not r.escalated
+    assert r.text == MESSAGES.text("empty_message")
+    assert h.classifier_llm.calls == [] and h.usage.calls == []
+    assert len(h.log_records()) == 1
+
+
 # --------------------------------------------------------------------------- eligibility
 
 

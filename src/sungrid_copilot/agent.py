@@ -44,6 +44,7 @@ AGENT_MESSAGE_KEYS = [
     "escalation_notice",
     "too_many_clarifications",
     "sources_header",
+    "empty_message",
 ]
 
 
@@ -60,6 +61,7 @@ class Outcome(str, Enum):
     INVALID_INPUT = "invalid_input"
     TOOL_ERROR = "tool_error"
     SERVICE_UNAVAILABLE = "service_unavailable"
+    EMPTY_MESSAGE = "empty_message"
 
 
 @dataclass
@@ -172,6 +174,9 @@ class CopilotAgent:
         self.usage.reset()
         run = _Run()
         start = time.perf_counter()
+        if not user_text.strip():  # nothing to classify; pending eligibility state is kept
+            response = self._reply(run, Outcome.EMPTY_MESSAGE, self.messages.text("empty_message"))
+            return self._finish(user_text, run, response, start)
         try:
             response = self._handle(user_text, session, run)
         except LLMContentFilterError:
@@ -185,6 +190,17 @@ class CopilotAgent:
                 Outcome.SERVICE_UNAVAILABLE,
                 self.messages.text("temporarily_unavailable"),
                 escalate="llm_error",
+                detail=type(e).__name__,
+            )
+        except Exception as e:
+            # Any other failure (index, embedder, config, a bug): no answer, a person follows up.
+            # Only the exception type is kept; its message could hold the member's text.
+            session.finish_eligibility()
+            response = self._reply(
+                run,
+                Outcome.SERVICE_UNAVAILABLE,
+                self.messages.text("temporarily_unavailable"),
+                escalate="internal_error",
                 detail=type(e).__name__,
             )
         return self._finish(user_text, run, response, start)
