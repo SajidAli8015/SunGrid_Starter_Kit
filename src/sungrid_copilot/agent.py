@@ -412,7 +412,10 @@ class CopilotAgent:
             tokens_out=self.usage.output_tokens,
             step_latency_ms={s.name: s.ms for s in run.trace},
             latency_ms=round((time.perf_counter() - start) * 1000, 1),
-            estimated_cost_usd=estimate_cost(calls, self.settings.llm.provider, self.settings.pricing),
+            estimated_cost_usd=estimate_cost(
+                calls, self.settings.llm.provider, self.settings.pricing,
+                self.settings.pricing_model_map,
+            ),
         )
         run.log.setdefault("service_called", False)
         run.log.setdefault("escalation_code", None)

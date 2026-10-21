@@ -28,6 +28,7 @@ from sungrid_copilot.llm import LLMError, get_llm_client
 from sungrid_copilot.llm.factory import describe_provider
 from sungrid_copilot.messages import Messages, MessagesError
 from sungrid_copilot.retrieval import Retriever
+from sungrid_copilot.usage import find_price
 
 SNIPPET_CHARS = 120
 DEFAULT_DEV_SET = PROJECT_ROOT / "eval" / "dev_queries.yaml"
@@ -67,6 +68,15 @@ def check_llm() -> int:
         print(f"Model: {reply.model}")
         print(f"Tokens: {reply.input_tokens} in / {reply.output_tokens} out")
         print(f"Latency: {reply.latency_s:.2f}s")
+        provider = settings.llm.provider
+        if find_price(provider, client.model, reply.model, settings.pricing,
+                      settings.pricing_model_map) is None:
+            print(
+                f"Warning: no price for provider '{provider}', model '{client.model}' (reported as "
+                f"'{reply.model}') in `pricing` in config/config.yaml; estimated cost will be null. "
+                "Add a price, or map the deployment in `pricing_model_map`.",
+                file=sys.stderr,
+            )
 
         parsed = client.complete_json(
             "You are a connectivity check.",
@@ -363,7 +373,9 @@ def run_eval_cli(args: argparse.Namespace) -> int:
             load_messages(Messages.load(settings.messages.resolved_file)),
             title_to_stem,
             workers=args.workers,
-            cost_fn=lambda calls: estimate_cost(calls, settings.llm.provider, settings.pricing),
+            cost_fn=lambda calls: estimate_cost(
+                calls, settings.llm.provider, settings.pricing, settings.pricing_model_map
+            ),
         )
 
     models = sorted({c["model"] for r in records for c in r.get("llm_calls", [])})

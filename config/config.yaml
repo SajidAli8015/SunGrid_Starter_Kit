@@ -79,9 +79,17 @@ logging:
   path: logs/queries.jsonl        # git-ignored; one JSON line per handled message
   include_query_text: false       # privacy default: log a SHA-256 hash and the length only
 
-# USD per 1M tokens, keyed by provider then model/deployment. null = unknown, so cost is null.
+# USD per 1M tokens, keyed by provider then model. null = unknown, so cost is null.
+# A call is priced by its configured model/deployment name if that is a key here, otherwise by the
+# model the provider reports (exactly, or with a -YYYY-MM-DD version suffix, e.g. gpt-4o-2024-11-20).
 pricing:
   azure_openai:
     gpt-4o:
       input_per_1m: 2.50
       output_per_1m: 10.00
+
+# Optional: provider -> deployment (or configured model) name -> key in `pricing`, for deployments
+# not named after their model. `check-llm` warns when no price matches.
+#   azure_openai:
+#     sungrid-prod-chat: gpt-4o
+pricing_model_map: {}

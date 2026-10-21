@@ -174,6 +174,8 @@ class Settings(BaseModel):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     # provider -> model/deployment -> price per 1M tokens
     pricing: dict[str, dict[str, ModelPrice]] = Field(default_factory=dict)
+    # Optional: provider -> configured model/deployment name -> key in `pricing`
+    pricing_model_map: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 def _resolve(path: Path) -> Path:
