@@ -83,5 +83,5 @@ logging:
 pricing:
   azure_openai:
     gpt-4o:
-      input_per_1m: null
-      output_per_1m: null
+      input_per_1m: 2.50
+      output_per_1m: 10.00
