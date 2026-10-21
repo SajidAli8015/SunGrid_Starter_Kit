@@ -185,6 +185,24 @@ def test_service_timeout_is_tool_error():
     assert time.perf_counter() - start < 1.5
 
 
+def test_hung_service_does_not_block_process_exit():
+    """A timed-out call must not keep the interpreter alive until the service returns (F5)."""
+    import subprocess
+    import sys
+
+    code = (
+        "import time\n"
+        "from sungrid_copilot.eligibility.adapter import EligibilityAdapter\n"
+        "def hung(**kwargs):\n"
+        "    time.sleep(8)\n"
+        f"print(EligibilityAdapter(hung, timeout_s=0.2).check({GOOD!r}))\n"
+    )
+    start = time.perf_counter()
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
+    assert "ToolError(kind='timeout'" in out.stdout, out.stderr
+    assert time.perf_counter() - start < 6  # interpreter start-up included; the service sleeps 8 s
+
+
 def test_misconfigured_service_fails_loudly():
     from sungrid_copilot.config import ConfigError, Settings
 

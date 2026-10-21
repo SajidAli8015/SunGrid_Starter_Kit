@@ -15,9 +15,8 @@ from __future__ import annotations
 import importlib
 import math
 import re
+import threading
 from collections.abc import Callable, Mapping
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from typing import Any
 
@@ -129,15 +128,22 @@ class EligibilityAdapter:
         if isinstance(normalised, InvalidInput):
             return normalised
 
-        # Run in a worker thread so a hung service cannot hang the Copilot. A timed-out call
-        # keeps running in its thread (Python cannot kill it); its result is discarded.
-        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="eligibility")
-        try:
-            future = pool.submit(self._service, **normalised)
-            return RawResult(future.result(timeout=self.timeout_s))
-        except FutureTimeout:
+        # Run in a daemon thread so a hung service can hang neither the reply nor process exit.
+        # A timed-out call keeps running in its thread (Python cannot kill it); its result is
+        # discarded, and the thread dies with the process.
+        box: dict[str, Any] = {}
+
+        def call() -> None:
+            try:
+                box["result"] = self._service(**normalised)
+            except Exception as e:  # the service failed; no details that could hold member data
+                box["error"] = type(e).__name__
+
+        thread = threading.Thread(target=call, name="eligibility", daemon=True)
+        thread.start()
+        thread.join(self.timeout_s)
+        if thread.is_alive():
             return ToolError("timeout")
-        except Exception as e:  # the service failed; no details that could hold member data
-            return ToolError("exception", type(e).__name__)
-        finally:
-            pool.shutdown(wait=False)
+        if "error" in box:
+            return ToolError("exception", box["error"])
+        return RawResult(box.get("result"))  # nothing stored -> None, which the gate rejects
