@@ -298,7 +298,8 @@ class CopilotAgent:
         )
         deterministic = render(outcome, self.messages)
 
-        if isinstance(outcome, NeedsInfo):
+        if isinstance(outcome, (NeedsInfo, InvalidInput)):
+            # Asking for missing details and asking to correct an invalid one share the limit.
             if session.clarification_turns >= self.settings.agent.max_clarification_turns:
                 session.finish_eligibility()
                 return self._reply(
@@ -306,12 +307,10 @@ class CopilotAgent:
                     self.messages.text("too_many_clarifications"),
                     escalate="too_many_clarifications",
                 )
-            session.pending_eligibility = True
+            session.pending_eligibility = True  # the member can answer or correct; no service call
             session.clarification_turns += 1
-            return self._reply(run, Outcome.NEEDS_INFO, deterministic)
-        if isinstance(outcome, InvalidInput):
-            session.pending_eligibility = True  # the member can correct it; no service call
-            return self._reply(run, Outcome.INVALID_INPUT, deterministic)
+            result = Outcome.NEEDS_INFO if isinstance(outcome, NeedsInfo) else Outcome.INVALID_INPUT
+            return self._reply(run, result, deterministic)
 
         session.finish_eligibility()
         if isinstance(outcome, TierNotHousehold):

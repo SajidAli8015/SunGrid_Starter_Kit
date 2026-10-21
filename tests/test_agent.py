@@ -333,6 +333,16 @@ def test_clarification_limit_escalates(kb, tmp_path):
     assert h.spy.calls == []
 
 
+def test_repeated_invalid_input_counts_toward_the_clarification_limit(kb, tmp_path):
+    text = "do I qualify? ZIP 123, 85k, 7.5 kW, approved, household"
+    bad_zip = json.dumps({**FULL_SLOTS, "household_zip": "123"})
+    h = _eligibility_harness(kb, tmp_path, {text: bad_zip})
+    outcomes = [h.ask(text).outcome for _ in range(4)]
+    assert outcomes == [Outcome.INVALID_INPUT] * 3 + [Outcome.TOO_MANY_CLARIFICATIONS]
+    assert not h.session.pending_eligibility and h.session.clarification_turns == 0
+    assert h.spy.calls == []
+
+
 def test_unrelated_follow_up_clears_pending_and_is_a_new_question(kb, tmp_path):
     t1, t2 = "do I qualify?", "How are monthly bill charges explained?"
     classifier = FakeLLMClient({q(t1): label("incentive_rebate", 0.95, True), q(t2): label("billing_account")})
