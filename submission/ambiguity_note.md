@@ -35,8 +35,8 @@ If the system forces the document into one category, half of the questions about
 
 ## Evidence
 
-Two evaluation questions are tagged `ambiguous_doc` (q14 from the billing side, q15 from the rebate side). Both retrieve
-document 06 and pass every automated check, in all three repeats (`eval_report.md`).
+Two evaluation questions depend on document 06 (q14 and q15). In the evaluation run of 2026-10-30, both retrieved
+document 06 and passed every automatic check (`eval_report.md`).
 
 ## Limits
 
@@ -45,7 +45,8 @@ document 06 and pass every automated check, in all three repeats (`eval_report.m
   separate development set, not on the evaluation questions.
 - The categories for documents 07 to 14 are my assumption: the starter kit labels only the first six. They are
   recorded in the manifest and are easy to change.
-- Retrieving document 06 does not guarantee a complete answer. The pipeline's answer to q15 did not say who makes the
-  reversal decision, and the first hand grading marked it incomplete (see `eval_report.md`).
+- Retrieving document 06 does not guarantee a complete answer. Reading the q15 reply, it does not say who makes the
+  reversal decision. It passes the automatic checks, but I would expect a hand grade to mark it incomplete
+  (`eval_report.md`).
 - Adding a new ambiguous document is a manifest edit plus an evaluation question, not a code change
   (`sop_new_document_category.md`).
