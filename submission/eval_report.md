@@ -1,181 +1,114 @@
 # Evaluation report
 
-All figures are counts of questions (n/N), not rates. The sample is small and the numbers are indicative, not
-statistically meaningful.
+I ran the full evaluation on 2026-10-30 at git commit `f06112d` (working tree clean), using `gpt-4o` on Azure OpenAI
+and `BAAI/bge-small-en-v1.5` embeddings. The raw output is in `eval_summary.md` in this folder.
+
+All figures are counts of questions (n/N), not rates. With 20 questions the numbers are indicative only. **This
+report relies on automatic checks. I have not yet graded the replies by hand**, and section 5 explains what that
+leaves open.
 
 ## 1. The evaluation set
 
 - 20 questions in `eval/questions.yaml`: 15 knowledge questions covering all five categories, 3 eligibility
   questions (eligible, ineligible, multi-turn slot filling) and 2 out-of-scope questions.
-- It includes the traps the brief names: two questions that depend on document 06, a terse fault-code query that must
-  not be declined, a question whose answer is not in the knowledge base, an arithmetic cap, and a time-qualified
-  statistic.
-- **Provenance:** the question set was written after the first end-to-end demo runs, so it is not blind. It is a
-  behaviour and regression check, not an accuracy benchmark. Thresholds were calibrated on a separate development set
-  (`eval/dev_queries.yaml`).
-- **Scoring (v2 criteria).** The automatic checks compare what the system did with what the question file expects:
-  category, retrieved documents, cited sources (for answered replies), outcome, tool call and, on q02 and q09, the
-  human-review flag, plus a fixed rule that non-eligible replies contain no `$`. **Reply correctness is not scored
-  automatically in v2**, and there is no LLM judge. Reply wording and facts, including dollar figures and safety
-  wording, are not auto-checked (`eval/README.md` lists what this costs per question). Hand grading is the only check of reply content and is an optional spot check.
-- **Earlier results (v1 criteria).** The figures below this section, unless marked otherwise, came from the earlier
-  criteria: ten automated checks that included regex wording checks and an escalation check, plus hand grading against
-  a reference answer on `correct` and `grounded` (`eval/RUBRIC.md`). I did the manual grading myself, for both the
-  pipeline run and the full-context run, as a single grader; there was no second grader. These figures are not
-  comparable with v2 numbers.
+- It includes the traps the brief names: two questions that depend on document 06 (the ambiguous one), a terse
+  fault-code query that must not be declined, a question whose answer is not in the knowledge base (q02), an
+  arithmetic cap (q05) and a time-qualified statistic (q13). Each question has a comment saying what it tests.
+- **Provenance.** I wrote the set after my first end-to-end demo runs, so it is not blind. I treat it as a
+  behaviour and regression check, not an accuracy benchmark. I calibrated thresholds on a separate development set
+  (`eval/dev_queries.yaml`), and I changed no prompt, threshold or manifest entry after the run reported here.
 
-## Results: v2 criteria
+## 2. How a question is scored
 
-TODO: fill from the eval v2 run.
+Each check compares something the system did with what the question file expects.
+
+| Check | Passes when | Scored on |
+|---|---|---|
+| `category_ok` | the classifier's category is one of the expected ones | 20 questions |
+| `retrieval_ok` | every expected source document is among the retrieved chunks | 15 |
+| `cited_ok` | at least one expected source is cited (only checked when the outcome is "answered") | 14 |
+| `outcome_ok` | the outcome (answered, abstained, declined, eligible, ineligible, needs info) is an allowed one | 20 |
+| `tool_ok` | the eligibility service was called, or not called, as expected | 20 |
+| `escalation_ok` | the reply was flagged for human review as expected | 2 (q02, q09) |
+| `hard_gate_ok` | no `$` in any reply whose outcome forbids amounts (ineligible, needs info, tier, errors) | 20 |
+
+A question passes (`auto_pass`) if no scored check fails. A crash or provider failure counts as an error and cannot
+pass. A check that a question does not specify is not counted, which is why N differs per check.
+
+## 3. Results
 
 | Measure | Result |
 |---|---|
-| Automated pass (`auto_pass`) | TODO: fill from the eval v2 run |
-| `category_ok` | TODO: fill from the eval v2 run |
-| `retrieval_ok` | TODO: fill from the eval v2 run |
-| `cited_ok` | TODO: fill from the eval v2 run |
-| `outcome_ok` | TODO: fill from the eval v2 run |
-| `tool_ok` | TODO: fill from the eval v2 run |
-| `escalation_ok` | TODO: fill from the eval v2 run |
-| `hard_gate_ok` | TODO: fill from the eval v2 run |
-| Errors | TODO: fill from the eval v2 run |
-
-## 2. Results: the pipeline, v1 criteria (regex checks + hand grading)
-
-| Measure (v1 criteria) | Result |
-|---|---|
-| Automated pass (`auto_pass`) | 18/20 |
-| Same outcome and same `auto_pass` across 3 repeats | 20/20 |
+| Automatic pass (`auto_pass`) | **18/20** |
 | Category matches expectation | 20/20 |
 | Expected sources retrieved | 15/15 |
-| Dollar-amount hard gate held | 20/20 |
-| Hand-graded correct | 17/20 |
-| Hand-graded grounded | 16/17 |
+| Expected source cited (answered questions) | 14/14 |
+| Outcome as expected | 19/20 |
+| Eligibility service called or not as expected | 20/20 |
+| Flagged for review as expected | 1/2 |
+| No dollar amount in a reply that forbids one | 20/20 |
 | Errors | 0/20 |
 
-### Failures (reported, not fixed)
+All three eligibility questions pass, including the ineligible one and the two-turn slot-filling one. The two
+no-tool traps (q04 battery add-on, q06 low-income credit) did not call the rooftop-rebate service. Both
+out-of-scope questions were declined, and the terse "Error E12" query was answered, not declined.
 
-| Question | What happened | Likely cause | Mitigation |
+## 4. Failures
+
+I am reporting both failures as they are. I did not tune anything to fix them.
+
+| Question | What the checks found | What the reply shows | Likely cause |
 |---|---|---|---|
-| q02 (can a Community-tier member run for the board?) | Said a flat "No, only Household-tier members…". The knowledge base does not say which tiers may stand. Not escalated. | The model inferred an exclusion from a related rule (who votes). Retrieval was correct. | A second pass that checks each claim against the cited text. One extra call. |
-| q13 (members and installed capacity) | Abstained, although the figures (just over 5,000 members, 38 MW) are in the annual report. | The report states the figures as of fiscal year end; the question asks about "now". The composer treated the mismatch as missing information. | A prompt rule: answer with the figure and state its date scope. |
-| q15 (who decides, how long to appeal, where) | Automated checks pass. Hand grading: incomplete, because the answer does not say who makes the reversal decision. | Retrieved the right documents; the composer did not state the decision maker. | Same claim-checking pass, with a completeness check against the question. |
+| q02: can a Community-tier member run for the board? | `escalation_ok` failed: the reply was not flagged for review | The reply says "No, Community-tier members cannot run... must be household-tier members." The documents say board seats are *elected by* Household-tier members, and say eligibility to stand varies by tier without giving the rule. The reply states an exclusion the documents do not support. | The model read "elected by Household members" (who votes) as "only Household members may stand" (who may run). Retrieval was correct. |
+| q13: how many members and how much capacity now? | `outcome_ok` failed: the system abstained | The figures (just over 5,000 members, 38 MW) are in the annual report, stated as of fiscal year end. The system's recorded reason is "incomplete information". | The question says "now", the report gives year-end figures, and the composer treated the date mismatch as missing information. Abstaining is safe but unhelpful. |
 
-q02 is the most important. It is a confident, plausible and wrong answer, and under v1 it passed every check except
-escalation. The hand grading caught it; the regexes could not. Under v2 `escalation_ok` still fails it when the reply is
-not flagged for review, but it does not read the reply: only hand grading can catch the wrong "No" itself.
+Both are reasoning failures in the answer step. Retrieval found the right document in both cases, so better search
+would not fix either. q02 is the more serious one: it is a confident, plausible and wrong answer, and the automatic
+checks caught it only because it was not flagged for review. They cannot read the claim itself.
 
-### Why each question was graded 0
+I would try two mitigations as separate, labelled runs: a second pass that checks each claim against the cited text
+(for q02), and a prompt rule to answer with the figure and state its date scope (for q13).
 
-How I scored: `correct` = the key facts match the reference answer and nothing contradicts the knowledge base. For an
-abstention, correct means the behaviour matches the reference. `grounded` = every claim is supported by a cited
-source. A score of 1 means I found the reference's key facts in the answer and no unsupported claim.
+## 5. What this evaluation does not show
 
-| Run | Question | correct | grounded | Reason |
-|---|---|---|---|---|
-| Pipeline | q02 | 0 | 0 | The answer states as fact that only Household-tier members may stand. The knowledge base says only that board seats are elected by Household-tier members and that candidates need 12 months in good standing; the policies document says eligibility varies by tier without saying how. The exclusion is therefore not supported by the cited text, so grounded is 0 too. The reference behaviour is to say it is not specified, give what is stated, and flag for review; the answer was not escalated. |
-| Pipeline | q13 | 0 | n/a | The figures are in the annual report, and the reference expects them with the note that they are as of fiscal year end. The system abstained instead, so the behaviour does not match the reference. Grounded does not apply to an abstention. |
-| Pipeline | q15 | 0 | 1 | The question has three parts: who decides, how long to appeal, where to appeal. The answer gave the second and third correctly and never named who makes the decision. Correct is 0 because a required part is missing. Grounded is 1 because what it did say is supported by the cited text. |
-| Full-context | q02 | 0 | 0 | The same unsupported "only Household-tier members" claim, for the same reasons as above. |
-| Full-context | q06 | 0 | n/a | It abstained. The knowledge base gives the threshold as 200% of the regional low-income threshold (without a dollar value), and the reference expects that fact. An abstention here is safe but not the expected behaviour. |
+- **Reply content is not scored.** The checks do not read the wording, figures or facts in a reply. A reply can pass
+  every check and still be wrong, and q02 shows it: the wrong "No" was caught only through the missing flag.
+- **I have not graded by hand.** The run folder contains `grade_sheet.csv`, ready for grading (`correct`,
+  `grounded`, `notes`; rubric in `eval/RUBRIC.md`). Human feedback is needed to say how many replies are actually
+  correct and grounded, so I make no accuracy claim.
+- **Escalation is scored on two questions only,** so the review-flag behaviour is barely measured.
+- **One run.** LLM output varies between runs even at temperature 0. I did not measure stability (`--repeat 3`) for
+  this run, and I did not re-run the full-context baseline (`--mode full-context`) under these criteria.
+- **Small and not blind.** See section 1.
+- **Classifier confidence is self-reported** by the LLM and is not calibrated. `category_ok` checks the label only.
 
-q13 in the full-context run was graded correct: the figures match the reference. It does not say the figures are as
-of fiscal year end, which I counted as a minor omission rather than an error.
+## 6. What I noticed in the replies (not graded)
 
-## 3. Baseline: all documents in one prompt (v1 criteria)
+These come from reading the saved replies, not from a check or a formal grade.
 
-To test whether retrieval earns its place, the same composer was run with all 69 chunks in one prompt (about 5,000
-input tokens), with no classifier, filter or search. It can only run the 15 knowledge questions.
+- q10 ("Error E12", a communication loss) was flagged for review as "Safety-related answer". That is cautious, not
+  harmful, but it is over-flagging, and it would spend review capacity.
+- q15 cites the right documents and the 30-day appeal window, but does not clearly say who makes the reversal
+  decision. It passes the automatic checks, and I would expect a manual grade to mark it incomplete.
+- The eligibility amounts were $2,400.00 (6 kW, q16) and $1,800.00 (4.5 kW, q18), matching the service's formula.
+  The ineligible reply (q17) contained no amount.
 
-| Measure (same 15 questions) | Pipeline | Full-context |
-|---|---|---|
-| Hand-graded correct | 12/15 | 13/15 |
-| Failed by hand | q02, q13, q15 | q02, q06 |
-| Input tokens per question | ~1,900 | ~4,950 |
-| LLM calls per question | 2 | 1 |
-| Cost per 1,000 queries (gpt-4o, Global Standard list price) | ~$6.1 | ~$13.3 |
-| Median latency | 3.5 to 3.8 s | 1.65 s |
+## 7. Cost and latency
 
-What this shows:
+- Tokens: 39,877 in and 2,825 out over 20 questions. Estimated cost is $0.128, about **$0.0064 per question**, or
+  about **$6.40 per 1,000 queries** at this question mix (a multi-turn question counts as one query).
+- Latency by outcome: answered, median 3.1 s (p95 6.7 s); eligible, median 5.3 s; ineligible 4.7 s; declined 1.2 s.
+  Eligibility questions cost more because they add a slot-extraction call and a next-steps call.
+- Latency depends on the provider and varies between runs. In an earlier three-question run the classifier call took
+  8 to 9 seconds, against 1 to 4 seconds here.
 
-- **Accuracy is a tie at this size.** One question of difference is noise at n=15.
-- **q02 fails in both modes**, so it is a reasoning failure, not a retrieval failure. Better search would not fix it.
-- **Over-abstention moves between questions** (q13 in the pipeline, q06 in full-context). That points at the
-  composer prompt, not at retrieval.
-- **Full-context is faster today** because it skips the classifier call. The latency figures are not like for like:
-  the pipeline's covers the whole turn, full-context's covers LLM time only.
-- **The pipeline costs about 2.2 times less today, and the gap grows with the knowledge base.** Full-context input
-  grows with the corpus. At ten times the documents it would be about 50,000 tokens per query (roughly $125 per 1,000
-  queries, assuming the same chunk size); at one hundred times it no longer fits in the context window. The
-  pipeline's per-query input stays flat.
-- So retrieval is justified here by cost at scale, a hard context limit, and sending the model only the sections a
-  question needs. It is not justified by accuracy or latency at 69 chunks.
-- Prompt caching of the fixed full-context prefix could narrow the cost gap. I have not verified the caching terms
-  for this deployment.
+## 8. What I would do next
 
-## 4. Cost and latency (pipeline, all 20 questions)
-
-| Outcome | n | Median latency | Mean LLM calls | Mean tokens in |
-|---|---|---|---|---|
-| Answered | 14 | 4.0 s | 2.0 | 1,893 |
-| Abstained | 1 | 3.1 s | 2.0 | 1,806 |
-| Declined out of scope | 2 | 2.4 s | 1.0 | 912 |
-| Eligibility, eligible | 2 | 15.3 s | 3.5 | 2,905 |
-| Eligibility, ineligible | 1 | 15.6 s | 3.0 | 2,610 |
-
-- Total over 20 questions: 38,553 tokens in, 2,886 out; $0.1252 total, $6.26 per 1,000 queries (gpt-4o 2024-11-20 at
-  $2.50 / $10.00 per million tokens, Global Standard).
-- The classifier is about half of the pipeline's input tokens and one of its two sequential calls.
-- Eligibility takes about 15 s and needs 3 to 3.5 calls (classify, extract slots, the service, then a next-steps
-  answer). That is too slow for a chat experience, and it is the first thing to reduce (section 5).
-- Latency on Azure varied between runs: earlier demo runs were slower. Treat these as rough.
-
-### How cost and latency were measured
-
-- **Cost:** the harness records input and output tokens for every LLM call. Cost is those tokens multiplied by the
-  list prices in `config/config.yaml`: $2.50 input and $10.00 output per million tokens for gpt-4o 2024-11-20, Global
-  Standard deployment. I took the prices from a third-party price page and have not yet checked them against
-  Microsoft's pricing page; other deployment types cost slightly more.
-- **Projection:** mean cost per question times 1,000, at the mix of questions in this set (a multi-turn question counts
-  as one query). A different mix of eligibility and plain questions would change it, because eligibility questions use
-  more calls.
-- **Not included:** embeddings (computed locally, no charge), hosting, the vector store, retries, and any cost of the
-  real eligibility service.
-- **Latency:** wall-clock time per question as measured by the evaluation harness, from the question being handed to
-  the agent until the reply is returned. For the pipeline this covers the classifier, retrieval, the eligibility
-  service and the composer. For the full-context run it is the sum of the LLM call times only, so the two are not
-  strictly comparable.
-- **Conditions:** three questions ran in parallel, LLM caches were off, and a single Azure deployment was called over
-  the public internet from one machine. This is not a load test. The first question each worker ran was consistently
-  slow (10 to 13 s), which I believe is first-call warm-up but have not confirmed.
-- **Repeats:** in the 3-repeat run every question gave the same outcome and the same `auto_pass` each time (20/20).
-  The summary tables for that run (`summary.md`) report the first repeat only, and so do the counts, latency and cost
-  figures in sections 2 and 4 of this report.
-- **Which run each figure comes from:**
-  - Sections 2 and 4 (automated counts, latency, cost, tokens): the repeat run `20261021T071440Z`, first repeat,
-    commit `389754f`. The earlier single run `20261020T155131Z` (commit `3228bbc`) also scored 18/20.
-  - Pipeline hand grading (17/20 correct, 16/17 grounded): the grade sheet of the first single run
-    `20261020T155131Z`.
-  - Full-context run and its hand grading: `20261021T073235Z-full-context`, commit `389754f`.
-  - The same-15-questions comparison in section 3 was computed from the saved `results.json` files of all three runs.
-    The pipeline cost came to $6.09 per 1,000 queries in the single run and $6.13 in the repeat run, averaged over its
-    three repeats.
-
-## 5. What I would do next
-
-1. Add a claim-checking pass for q02 and q15 (one extra call), then re-run on a fresh question set, not this one.
-2. Add the prompt rule for time-qualified answers (q13).
-3. Cut latency: run classification in parallel with the unfiltered search (already needed for the fallback), use a
-   smaller model for the classifier, and merge classification with slot extraction.
-4. Grow the evaluation set to 100 or more questions with a second grader, and write the answers before looking at
-   system output.
-5. Test the other providers against a live key. Only Azure OpenAI was verified end to end; the others are implemented
-   and unit-tested with fakes.
-
-## 6. Limitations
-
-- Small n, a set that is not blind, and a single grader.
-- Reply correctness is not scored automatically in v2. A reply can pass every check and still be wrong.
-- The classifier's confidence is self-reported and not calibrated.
-- The output guard cannot detect dollar amounts written in words.
-- Every eligibility result comes from a stub; the real service's behaviour, latency and failure modes are unknown.
+1. Grade the replies by hand with the rubric, ideally with a second grader, and report correct and grounded counts.
+2. Re-run with `--repeat 3` to see which questions are unstable.
+3. Re-run `--mode full-context` to compare the pipeline with putting the whole knowledge base in one prompt.
+4. Add an LLM judge that compares each reply with the reference answer, and validate it against the manual grades.
+5. Re-add wording checks where a regex is a reliable guard (for example "no gateway reset" on q09).
+6. Grow the set to 100 or more questions, with expected answers written before looking at the system's replies.
+7. In production, sample live replies for human review, track abstain and escalation rates, and re-run this set
+   after every prompt, model or knowledge-base change.
