@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sungrid_copilot.config import PROJECT_ROOT, Settings
-from sungrid_copilot.evaluation.checks import CHECK_NAMES, INFORMATIONAL
+from sungrid_copilot.evaluation.checks import CHECK_NAMES
 from sungrid_copilot.evaluation.schema import EvalSet, Question, provenance_note
 
 GRADE_COLUMNS = [
@@ -130,22 +130,22 @@ def build_summary(meta: dict, records: list[dict], eval_set: EvalSet) -> str:
         "",
         f"> The sample is small ({n} questions). Every figure below is a count of questions (n/N), "
         "not a rate, and N differs per check because a check is only scored where the question "
-        "specifies it. Regexes are a coarse proxy for correctness; see the hand grading.",
+        "specifies it. The checks compare what the system did with what the question expects; "
+        "they do not score the content of the reply (see the optional hand grading).",
     ]
     if baseline:
         lines += [
             "",
             "> BASELINE: all knowledge-base chunks in one prompt to the same composer, with no "
-            "classification, filtering or retrieval. Only text checks are scored; retrieval, category, "
-            "tool and escalation checks are N/A.",
+            "classification, filtering or retrieval. Only outcome_ok and cited_ok are scored; the other "
+            "checks are N/A.",
         ]
 
     counts = check_counts(scored)
     errors = sum(1 for x in scored if x.get("error"))
     lines += ["", "## Automated checks", "", "| check | passed |", "|---|---|"]
     for name in CHECK_NAMES:
-        note = " (informational, not in auto_pass)" if name in INFORMATIONAL else ""
-        lines.append(f"| {name}{note} | {_fmt(counts[name])} |")
+        lines.append(f"| {name} | {_fmt(counts[name])} |")
     lines += [f"| **auto_pass** | **{_fmt(counts['auto_pass'])}** |", f"| errors | {errors}/{n} |"]
 
     by_tag: dict[str, list[dict]] = defaultdict(list)
@@ -169,15 +169,7 @@ def build_summary(meta: dict, records: list[dict], eval_set: EvalSet) -> str:
         if rec.get("error"):
             lines.append(f"  - error: {rec['error']}")
         for name, detail in rec["check_details"].items():
-            marker = " (informational)" if name in INFORMATIONAL else ""
-            lines.append(f"  - `{name}`{marker}: {detail}")
-    informational_only = [
-        x for x in scored if x["auto_pass"] and any(k in INFORMATIONAL for k in x["check_details"])
-    ]
-    for rec in informational_only:
-        lines.append(f"- {rec['id']} passed, but: " + "; ".join(
-            f"`{k}`: {v}" for k, v in rec["check_details"].items()
-        ))
+            lines.append(f"  - `{name}`: {detail}")
 
     groups: dict[str, list[dict]] = defaultdict(list)
     for rec in scored:
@@ -254,8 +246,7 @@ def write_grade_sheet(path: Path, records: list[dict], eval_set: EvalSet) -> Non
                 "final_answer": rec.get("final_text", ""),
                 "cited_sources": "; ".join(rec.get("cited_stems", [])),
                 "auto_pass": rec["auto_pass"],
-                "failed_checks": "; ".join(k for k in rec["check_details"] if k not in INFORMATIONAL)
-                + ("; error" if rec.get("error") else ""),
+                "failed_checks": "; ".join([*rec["check_details"], *(["error"] if rec.get("error") else [])]),
                 "reference": q.reference.strip(),
                 "correct": "",
                 "grounded": "",

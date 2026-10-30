@@ -28,7 +28,7 @@ dropped. SunGrid Cooperative is fictional and all documents are synthetic.
 ```
 config/            config.yaml (settings, thresholds, pricing), categories.yaml, messages.yaml, doc_manifest.yaml
 docs/              the knowledge base (14 markdown files, unchanged from the kit)
-eval/              questions.yaml (held-out set), dev_queries.yaml (tuning only), RUBRIC.md, README.md
+eval/              questions.yaml (evaluation set), dev_queries.yaml (tuning only), RUBRIC.md, README.md
 scripts/           clean_clone_check.py
 src/sungrid_copilot/
   agent.py         the bounded flow above
@@ -161,7 +161,8 @@ import each other.
 - The service reports only the first failing condition, so an ineligible reply never says "the only issue is".
 - An eligible result is a preliminary check, not a determination; the reply says funding and documentation
   requirements apply and the committee decides.
-- The held-out evaluation set was written after the first demo runs, so it is not blind.
+- The question set was written after the first end-to-end demo runs, so it is not blind. It is a behaviour and
+  regression check, not an accuracy benchmark.
 
 ## Known limitations
 
@@ -173,14 +174,18 @@ import each other.
 - Classifier confidence is self-reported by the LLM and uncalibrated; it only widens search, except in the
   guarded decline.
 - Known wrong answer: "Can a Community-tier member run for the board?" is answered with a flat "no" that the
-  documents do not support (they never say which tiers may stand), and is not escalated (eval q02).
+  documents do not support (they never say which tiers may stand), and is not escalated (eval q02). The automatic
+  eval check `escalation_ok` fails it for the missing review flag; only hand grading can catch the wrong "no" itself.
 - Over-abstention on time-qualified questions: "How many members does SunGrid have now?" abstains although the
   annual report figures were retrieved (eval q13).
 - The category filter compares top-1 scores only, so a multi-document question can lose one source.
 - Only Azure OpenAI has been verified against a live service.
 - The vector store (`.chroma/`) and LLM caches (`.cache/`) are local and single-user; usage tracking is
   per-process and not thread-safe for concurrent requests.
-- The evaluation set is small (20 questions); results are counts, not rates.
+- The evaluation set is small (20 questions); results are counts, not rates. Its automatic checks cover behaviour
+  (category, retrieval, citations, outcome, tool call, the review flag on q02 and q09, plus a literal `$` rule on
+  non-eligible replies), not whether
+  a reply's content is correct. There is no LLM judge; hand grading is an optional spot check.
 
 More detail, with reasons, in [NOTES.md](NOTES.md).
 

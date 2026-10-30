@@ -43,16 +43,16 @@ def rec(qid, tags, auto_pass, checks, details=None, outcome="answered", cost=Non
 
 
 RECORDS = [
-    rec("q1", ["billing_account"], True, {"contains_ok": True, "hard_gate_ok": True}),
-    rec("q2", ["billing_account", "trap"], False, {"contains_ok": False, "hard_gate_ok": True},
-        {"contains_ok": "no match for ['original due date']"}),
+    rec("q1", ["billing_account"], True, {"cited_ok": True, "hard_gate_ok": True}),
+    rec("q2", ["billing_account", "trap"], False, {"cited_ok": False, "hard_gate_ok": True},
+        {"cited_ok": "none of ['12_autopay'] in cited []"}),
     rec("q3", ["non_relevant"], True, {"hard_gate_ok": True}, outcome="declined_out_of_scope"),
 ]
 
 
 def test_counts_use_only_scored_checks():
     counts = check_counts(RECORDS)
-    assert counts["contains_ok"] == (1, 2)
+    assert counts["cited_ok"] == (1, 2)
     assert counts["hard_gate_ok"] == (3, 3)
     assert counts["auto_pass"] == (2, 3)
     assert counts["tool_ok"] == (0, 0)
@@ -62,12 +62,16 @@ def test_summary_has_header_counts_tags_and_failing_detail():
     s = build_summary(META, RECORDS, EVAL_SET)
     assert "`abc123` (working tree dirty: no)" in s
     assert "fallback_margin=0.04" in s and "Provenance: written after the demos." in s
-    assert "| contains_ok | 1/2 |" in s and "| **auto_pass** | **2/3** |" in s
+    assert "| cited_ok | 1/2 |" in s and "| **auto_pass** | **2/3** |" in s
     assert "| tool_ok | n/a |" in s
     assert "| trap | 0/1 |" in s and "| billing_account | 1/2 |" in s
-    assert "**q2** (billing_account, trap)" in s and "no match for ['original due date']" in s
+    assert "**q2** (billing_account, trap)" in s and "none of ['12_autopay'] in cited []" in s
     assert "not a rate" in s and "%" not in s.split("## Automated checks")[1]
     assert "| answered | 2 |" in s
+    assert "do not score the content of the reply" in s
+    assert "| escalation_ok | n/a |" in s
+    for removed in ("contains_ok", "retrieval_any", "informational"):
+        assert removed not in s
 
 
 def test_cost_lines_omitted_without_pricing_and_shown_with_it():
@@ -103,7 +107,7 @@ def test_grade_sheet_round_trip_and_merge(tmp_path):
     with (tmp_path / "grade_sheet.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert [r["id"] for r in rows] == ["q1", "q2", "q3"]
-    assert rows[0]["reference"] == "21 days" and rows[1]["failed_checks"] == "contains_ok"
+    assert rows[0]["reference"] == "21 days" and rows[1]["failed_checks"] == "cited_ok"
     assert rows[0]["correct"] == rows[0]["grounded"] == rows[0]["notes"] == ""
 
     sheet = tmp_path / "grade_sheet.csv"

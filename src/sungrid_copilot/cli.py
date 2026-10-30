@@ -96,6 +96,8 @@ def run_ingest() -> int:
     """Rebuild the vector index from docs/ and the manifest."""
     try:
         settings = load_settings()
+
+        
         counts = ingest(settings, get_embedder(settings.embedding.model))
     except (ConfigError, CategoryError, ManifestError, EmbeddingError) as e:
         print(f"ingest failed: {e}", file=sys.stderr)
@@ -305,7 +307,7 @@ RESULTS_DIR = PROJECT_ROOT / "eval" / "results"
 
 
 def run_eval_cli(args: argparse.Namespace) -> int:
-    """Run the held-out evaluation set and write results.json, summary.md and grade_sheet.csv."""
+    """Run the evaluation set and write results.json, summary.md and grade_sheet.csv."""
     from datetime import datetime, timezone
 
     from sungrid_copilot.answer import AnswerComposer
@@ -451,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
     ask_parser.add_argument("--once", metavar="QUESTION", help="Handle one message and exit")
     ask_parser.add_argument("--debug", action="store_true", help="Print the trace and usage")
 
-    eval_parser = sub.add_parser("eval", help="Run the held-out evaluation set")
+    eval_parser = sub.add_parser("eval", help="Run the evaluation set")
     eval_parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
     eval_parser.add_argument("--ids", help="Comma-separated question ids")
     eval_parser.add_argument("--tags", help="Comma-separated tags (any match)")

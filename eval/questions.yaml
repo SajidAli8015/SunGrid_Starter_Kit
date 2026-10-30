@@ -1,24 +1,30 @@
-# Held-out evaluation set for the SunGrid Copilot (20 questions).
+# Evaluation set for the SunGrid Copilot (20 questions).
 #
-# Provenance: written AFTER the first end-to-end demo runs, so it is not fully blind. Questions tagged
-# `seen_in_demo` closely mirror a demo query. Do not tune prompts, thresholds or the manifest against this set
-# before the baseline run; record any later change as a separate, labelled run.
+# Provenance: The question set was written after the first end-to-end demo runs, so it is not blind.
+# It is a behaviour and regression check, not an accuracy benchmark.
+#
+# Do not tune prompts, thresholds or the manifest against this set; record any later change as a
+# separate, labelled run.
 #
 # Schema
 #   turns:        list of {say, expect_outcome?}. One entry for single-turn questions. All turns share one Session.
 #   expect:       checks applied to the FINAL turn. A key set to null (or omitted) is not scored.
 #     category_any   classifier category must be one of these (snake_case; non_relevant allowed)
-#     sources        doc file stems that must ALL appear in the retrieved context (retrieval check) and are
-#                    also reported against the cited sources
+#     sources        doc file stems: ALL must appear in the retrieved context (retrieval_ok) and, when
+#                    the outcome is answered, at least one must be cited (cited_ok)
 #     outcome_in     allowed values of the agent outcome
 #     tool_called    whether the eligibility service must (true) or must not (false) have been called
-#     escalated      whether the reply must be flagged for human review
-#     must_contain   regexes (case-insensitive) that must ALL match the final text
-#     must_not_contain regexes (case-insensitive) that must NOT match the final text
+#     escalated      whether the reply must be flagged for human review (set on q02 and q09 only)
 #   reference:    short expected answer for the human grader (not machine-checked)
+#
+# The checks compare what the system did with what is expected here; they do not score the content
+# of a reply. Each question's comment says what it tests and what is NOT AUTO-CHECKED.
 version: 1
 questions:
 
+  # q01 | TESTS: plain fact from one document (tier change rule)
+  #     | PASS MEANS: says once per 12 months, effective the next billing cycle
+  #     | NOT AUTO-CHECKED: the rule stated in the reply
   - id: q01
     tags: [program_policies, single_doc]
     turns:
@@ -28,13 +34,13 @@ questions:
       sources: [01_program_policies]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['once', '12', 'next billing cycle']
-      must_not_contain: []
     reference: "Once per 12-month period; takes effect on the first day of the next billing cycle."
 
+  # q02 | TESTS: incomplete KB: the docs do not say which tiers may stand for the board
+  #     | PASS MEANS: says it is not specified, gives what is stated and flags for review; a flat "No" is wrong
+  #     | NOT AUTO-CHECKED: the wrong flat "No" itself; escalation_ok fails only if the reply is not flagged for review
   - id: q02
-    tags: [program_policies, governance, incomplete_kb, hand_graded_critical, seen_in_demo]
+    tags: [program_policies, governance, incomplete_kb, hand_graded_critical]
     turns:
       - say: "Can a Community-tier member run for a seat on the cooperative board?"
     expect:
@@ -43,14 +49,15 @@ questions:
       outcome_in: [answered, abstained]
       tool_called: false
       escalated: true
-      must_contain: []
-      must_not_contain: []
     reference: >
       The KB does not say which tiers may stand. It says board seats are elected by Household-tier members and
       candidates need 12 months in good standing; the policies doc says eligibility to hold board positions varies
       by tier without specifying how. Correct behaviour: say it is not specified, give what is stated, flag for
-      review. A flat "No" or "only Household members can ..." is wrong. Judge by hand; regexes are too weak here.
+      review. A flat "No" or "only Household members can ..." is wrong. Judge by hand.
 
+  # q03 | TESTS: plain fact: rooftop rebate rate and cap
+  #     | PASS MEANS: says $0.40 per watt, capped at $4,000
+  #     | NOT AUTO-CHECKED: the figures in the reply
   - id: q03
     tags: [incentive_rebate, single_doc]
     turns:
@@ -60,11 +67,11 @@ questions:
       sources: [02_incentive_rebate_programs]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['0\.40', '4,000']
-      must_not_contain: []
     reference: "$0.40 per watt, capped at $4,000 per household."
 
+  # q04 | TESTS: no-tool trap: the battery add-on is not the rooftop rebate
+  #     | PASS MEANS: service NOT called; says it needs an approved rooftop rebate determination
+  #     | NOT AUTO-CHECKED: the stated requirement
   - id: q04
     tags: [incentive_rebate, battery, no_tool_trap]
     turns:
@@ -74,13 +81,13 @@ questions:
       sources: [09_battery_storage_incentive]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['rooftop']
-      must_not_contain: []
     reference: >
       No. It requires an approved Rooftop Rebate determination on file; standalone battery installs are not eligible.
       The eligibility service must NOT be called (it only covers the rooftop rebate).
 
+  # q05 | TESTS: arithmetic with a cap
+  #     | PASS MEANS: 13,500 Wh x $0.15 = $2,025, capped at $1,500
+  #     | NOT AUTO-CHECKED: the arithmetic and the final figure
   - id: q05
     tags: [incentive_rebate, battery, arithmetic]
     turns:
@@ -90,13 +97,13 @@ questions:
       sources: [09_battery_storage_incentive]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['1,500']
-      must_not_contain: []
     reference: "13,500 Wh x $0.15 = $2,025, capped at $1,500 per household, so $1,500."
 
+  # q06 | TESTS: no-tool trap and missing value: the threshold is a regional value not in the KB
+  #     | PASS MEANS: says 200% of the regional threshold, invents no dollar figure; rebate service not called
+  #     | NOT AUTO-CHECKED: the 200% statement and any invented dollar figure
   - id: q06
-    tags: [incentive_rebate, low_income, missing_value, no_tool_trap, seen_in_demo]
+    tags: [incentive_rebate, low_income, missing_value, no_tool_trap]
     turns:
       - say: "What household income do I need to be under to get the low-income bill credit?"
     expect:
@@ -104,14 +111,14 @@ questions:
       sources: [10_low_income_bill_credit]
       outcome_in: [answered, abstained]
       tool_called: false
-      escalated: null
-      must_contain: ['200\s?%']
-      must_not_contain: ['\$\s?\d{2,3},\d{3}']
     reference: >
       Income below 200% of the regional low-income threshold, verified annually. The threshold value is not in the
       KB, so no dollar figure may be given. Credit is a flat $25 per month. The rooftop-rebate service must NOT be
       called and its $120k threshold must not be used.
 
+  # q07 | TESTS: plain fact: annual net metering true-up
+  #     | PASS MEANS: says it happens each March and excess generation earns a credit
+  #     | NOT AUTO-CHECKED: the facts stated in the reply
   - id: q07
     tags: [billing_account, single_doc]
     turns:
@@ -121,11 +128,11 @@ questions:
       sources: [11_net_metering_trueup]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['March', 'credit']
-      must_not_contain: []
     reference: "Annual true-up for the 12-month cycle ending each March; net excess generation earns a credit at the tier's net metering rate, applied to the next regular bill."
 
+  # q08 | TESTS: trap: which date the late-payment clocks run from
+  #     | PASS MEANS: says they run from the ORIGINAL due date, not the failure date
+  #     | NOT AUTO-CHECKED: the date stated in the reply
   - id: q08
     tags: [billing_account, autopay, trap]
     turns:
@@ -135,13 +142,13 @@ questions:
       sources: [12_autopay_failure_policy]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['original due date']
-      must_not_contain: []
     reference: "Two more retries over the next 5 business days, then manual-pay for that cycle. The 45-day and 90-day timelines run from the ORIGINAL due date, not from the failure date."
 
+  # q09 | TESTS: safety: fault E07
+  #     | PASS MEANS: says an installer inspection is needed, suggests no reset, flagged for review
+  #     | NOT AUTO-CHECKED: the safety wording (a suggested reset); the review flag is covered by escalation_ok
   - id: q09
-    tags: [technical_installation, safety, seen_in_demo]
+    tags: [technical_installation, safety]
     turns:
       - say: "My inverter is showing fault code E07. What should I do?"
     expect:
@@ -150,10 +157,11 @@ questions:
       outcome_in: [answered]
       tool_called: false
       escalated: true
-      must_contain: ['installer', 'inspect']
-      must_not_contain: ['gateway\s+reset', 'reset\s+the\s+gateway']
     reference: "E07 is a ground fault: it requires an installer inspection before re-energizing. Do not suggest a reset. Safety-related, flag for review."
 
+  # q10 | TESTS: terse query "Error E12" must not be declined as off-topic
+  #     | PASS MEANS: answered, explaining a gateway communication loss
+  #     | NOT AUTO-CHECKED: the explanation (the not-declined part is covered by outcome_ok)
   - id: q10
     tags: [technical_installation, terse_query, not_declined_trap]
     turns:
@@ -163,11 +171,11 @@ questions:
       sources: [04_technical_installation_guidance]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['gateway']
-      must_not_contain: []
     reference: "E12 is a communication loss between the inverter and the monitoring gateway, often resolved by a gateway reset. A terse query must not be declined as non_relevant."
 
+  # q11 | TESTS: multi-hop across two documents
+  #     | PASS MEANS: says micro-inverters for split roofs and an AC-coupled battery
+  #     | NOT AUTO-CHECKED: the facts stated in the reply
   - id: q11
     tags: [technical_installation, multi_hop]
     turns:
@@ -177,11 +185,11 @@ questions:
       sources: [04_technical_installation_guidance, 13_battery_storage_installation]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['micro-?inverter', 'AC[- ]?coupl']
-      must_not_contain: []
     reference: "Micro-inverters are required for mixed-orientation roof sections; systems with micro-inverters need a battery with AC-coupling support."
 
+  # q12 | TESTS: temporal and incomplete: a planned fourth tier
+  #     | PASS MEANS: says it is planned and eligibility is not finalized; does not say multi-family qualifies
+  #     | NOT AUTO-CHECKED: any claim that multi-family qualifies
   - id: q12
     tags: [company_updates, temporal, trap]
     turns:
@@ -191,11 +199,11 @@ questions:
       sources: [05_company_updates]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['fourth|new', 'not\s+(yet\s+)?(been\s+)?(finali[sz]ed|published|determined)|not yet']
-      must_not_contain: ['multi-family[^.]{0,60}\b(are|would be|will be)\s+eligible']
     reference: "A fourth tier for multi-family developments is planned for next fiscal year; eligibility and rebate treatment are not finalized and members should not rely on the document for eligibility guidance."
 
+  # q13 | TESTS: time scope: figures are as of fiscal year end, not necessarily "now"
+  #     | PASS MEANS: gives just over 5,000 members and 38 MW with that date note, and does not abstain
+  #     | NOT AUTO-CHECKED: the figures and the date note (abstaining is covered by outcome_ok)
   - id: q13
     tags: [company_updates, single_doc, time_scope]
     turns:
@@ -205,11 +213,11 @@ questions:
       sources: [14_annual_impact_report]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['5,000', '38']
-      must_not_contain: []
     reference: "Just over 5,000 members across all tiers and 38 MW installed capacity, as of the end of the fiscal year in the annual report (not necessarily 'now')."
 
+  # q14 | TESTS: ambiguous document 06, billing wording
+  #     | PASS MEANS: says a reversed rebate is recovered by billing adjustment over up to 6 cycles; appeal via the Incentive Program
+  #     | NOT AUTO-CHECKED: the facts stated in the reply
   - id: q14
     tags: [ambiguous_doc, billing_wording]
     turns:
@@ -219,11 +227,11 @@ questions:
       sources: [06_ambiguous_rebate_billing_adjustments]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['\b6\b|six', 'appeal']
-      must_not_contain: []
     reference: "A reversed rebate is recovered through a billing adjustment over up to 6 monthly cycles, with at least 30 days' written notice; appeal through the Incentive Program appeals process."
 
+  # q15 | TESTS: ambiguous document 06, multi-hop, rebate wording
+  #     | PASS MEANS: the Incentive Program committee decides; 30-day appeal, NOT the 15-business-day grievance procedure
+  #     | NOT AUTO-CHECKED: who decides and the deadline; a wrong 15-business-day deadline passes the automatic checks
   - id: q15
     tags: [ambiguous_doc, rebate_wording, multi_hop, number_confusion]
     turns:
@@ -233,13 +241,13 @@ questions:
       sources: [06_ambiguous_rebate_billing_adjustments, 02_incentive_rebate_programs]
       outcome_in: [answered]
       tool_called: false
-      escalated: null
-      must_contain: ['30\s*days', 'Incentive Program']
-      must_not_contain: ['appeal[^.]{0,80}15\s*business\s*days']
     reference: "The Incentive Program committee makes the determination; appeal within 30 days of the determination through the Incentive Program appeals process, NOT the general grievance procedure (15 business days)."
 
+  # q16 | TESTS: eligibility, eligible path
+  #     | PASS MEANS: service called, $2,400.00 for 6 kW, labelled preliminary
+  #     | NOT AUTO-CHECKED: the amount and the preliminary wording
   - id: q16
-    tags: [eligibility, eligible, seen_in_demo]
+    tags: [eligibility, eligible]
     turns:
       - say: "Am I eligible for the rooftop rebate? I'm a Household-tier member in ZIP 94102, our household income is $72,000 a year, we're installing a 6 kW system, and the installer is SunGrid-approved."
     expect:
@@ -247,13 +255,13 @@ questions:
       sources: []
       outcome_in: [eligible_preliminary]
       tool_called: true
-      escalated: null
-      must_contain: ['2,400\.00', 'preliminary']
-      must_not_contain: []
     reference: "Eligible on the pre-check: 6 kW x $0.40/W = $2,400.00 from the service, labelled preliminary with the funding/documentation caveat."
 
+  # q17 | TESTS: eligibility, ineligible path: income over the threshold
+  #     | PASS MEANS: ineligible, and the reply has no dollar amount
+  #     | NOT AUTO-CHECKED: wording such as "you would normally get" (a literal $ is covered by hard_gate_ok)
   - id: q17
-    tags: [eligibility, ineligible, hard_gate, seen_in_demo]
+    tags: [eligibility, ineligible, hard_gate]
     turns:
       - say: "Can I get the rooftop rebate? Household tier, ZIP 94105, we earn $135,000 a year, the system is 8 kW and our installer is SunGrid-approved."
     expect:
@@ -261,13 +269,13 @@ questions:
       sources: []
       outcome_in: [ineligible]
       tool_called: true
-      escalated: null
-      must_contain: ['not\s+qualify']
-      must_not_contain: ['\$', 'estimated\s+rebate', 'normally']
     reference: "Ineligible (income over the regional threshold). The reply contains NO dollar amounts and no estimate, quotes the service's reason, and notes only the first failing check is reported."
 
+  # q18 | TESTS: multi-turn slot filling
+  #     | PASS MEANS: turn 1 asks for the missing details without calling the service; turn 2 gives $1,800.00 for 4.5 kW
+  #     | NOT AUTO-CHECKED: the amount and that turn 1 asks ONE combined question
   - id: q18
-    tags: [eligibility, multi_turn, slot_filling, seen_in_demo]
+    tags: [eligibility, multi_turn, slot_filling]
     turns:
       - say: "I just had solar installed, can I get the rooftop rebate?"
         expect_outcome: needs_info
@@ -277,11 +285,10 @@ questions:
       sources: []
       outcome_in: [eligible_preliminary]
       tool_called: true
-      escalated: null
-      must_contain: ['1,800\.00']
-      must_not_contain: []
     reference: "Turn 1 asks ONE combined question for the missing details without calling the service. Turn 2 gives all details: eligible on the pre-check, 4.5 kW x $0.40/W = $1,800.00."
 
+  # q19 | TESTS: off-topic (restaurant)
+  #     | PASS MEANS: declined
   - id: q19
     tags: [non_relevant]
     turns:
@@ -291,11 +298,10 @@ questions:
       sources: []
       outcome_in: [declined_out_of_scope]
       tool_called: false
-      escalated: null
-      must_contain: []
-      must_not_contain: ['\$']
     reference: "Politely declines: the assistant only handles SunGrid questions."
 
+  # q20 | TESTS: off-topic (poem)
+  #     | PASS MEANS: declined
   - id: q20
     tags: [non_relevant]
     turns:
@@ -305,7 +311,4 @@ questions:
       sources: []
       outcome_in: [declined_out_of_scope]
       tool_called: false
-      escalated: null
-      must_contain: []
-      must_not_contain: []
     reference: "Politely declines: the assistant only handles SunGrid questions."

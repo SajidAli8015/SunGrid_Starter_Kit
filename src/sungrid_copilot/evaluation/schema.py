@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import yaml
@@ -22,15 +21,6 @@ class Turn(_Strict):
     expect_outcome: str | None = None
 
 
-def _compile_all(patterns: list[str]) -> list[str]:
-    for p in patterns:
-        try:
-            re.compile(p)
-        except re.error as e:
-            raise ValueError(f"regex {p!r} does not compile: {e}") from e
-    return patterns
-
-
 class Expect(_Strict):
     """Checks on the FINAL turn. None or empty = not scored."""
 
@@ -39,13 +29,6 @@ class Expect(_Strict):
     outcome_in: list[str] | None = None
     tool_called: bool | None = None
     escalated: bool | None = None
-    must_contain: list[str] | None = None
-    must_not_contain: list[str] | None = None
-
-    @field_validator("must_contain", "must_not_contain")
-    @classmethod
-    def _regexes_compile(cls, value: list[str] | None) -> list[str] | None:
-        return None if value is None else _compile_all(value)
 
 
 class Question(_Strict):

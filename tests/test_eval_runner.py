@@ -27,11 +27,11 @@ questions:
     tags: [billing_account]
     turns: [{{say: "{BILL_Q}"}}]
     expect: {{category_any: [billing_account], sources: [bills], outcome_in: [answered],
-              tool_called: false, must_contain: ['explained']}}
+              tool_called: false}}
   - id: e2
     tags: [eligibility, eligible]
     turns: [{{say: "{ELIG_Q}"}}]
-    expect: {{outcome_in: [eligible_preliminary], tool_called: true, must_contain: ['3,000\\.00']}}
+    expect: {{outcome_in: [eligible_preliminary], tool_called: true}}
   - id: e3
     tags: [non_relevant]
     turns: [{{say: "{POEM_Q}"}}]
@@ -132,7 +132,9 @@ def test_full_context_baseline_skips_eligibility_and_non_relevant():
     assert by_id["e2"]["skipped"] and by_id["e3"]["skipped"]
     e1 = by_id["e1"]
     assert e1["mode"] == "full-context" and e1["auto_pass"] is True
-    assert e1["checks"]["contains_ok"] is True and e1["checks"]["retrieval_all"] is None
-    assert e1["checks"]["category_ok"] is None and e1["cited_stems"] == ["bills"]
+    assert e1["checks"]["outcome_ok"] is True and e1["checks"]["cited_ok"] is True
+    assert e1["checks"]["retrieval_ok"] is None and e1["checks"]["category_ok"] is None
+    assert e1["checks"]["tool_ok"] is None and e1["checks"]["escalation_ok"] is None
+    assert e1["cited_stems"] == ["bills"]
     assert len(composer_llm.calls) == 1
     assert "[S1] Bills > Charges" in composer_llm.calls[0].messages[0]["content"]

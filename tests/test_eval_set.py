@@ -7,7 +7,7 @@ import yaml
 
 from sungrid_copilot.categories import load_categories
 from sungrid_copilot.config import load_settings
-from sungrid_copilot.evaluation.schema import load_eval_set
+from sungrid_copilot.evaluation.schema import load_eval_set, provenance_note
 from sungrid_copilot.kb.manifest import load_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,3 +69,23 @@ def test_no_question_is_copied_from_the_dev_set(questions):
     for q in questions:
         for turn in q.turns:
             assert turn.say.strip().lower() not in dev_texts, q.id
+
+
+def test_provenance_says_the_set_is_not_blind():
+    note = provenance_note(QUESTIONS)
+    assert "so it is not blind" in note and "not an accuracy benchmark" in note
+
+
+def test_every_question_says_what_it_tests():
+    lines = QUESTIONS.read_text(encoding="utf-8").splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith("  - id: "):
+            qid = line.split()[-1]
+            block = [x for x in lines[max(0, i - 3):i] if x.lstrip().startswith("#")]
+            assert any(x.startswith(f"  # {qid} | TESTS: ") for x in block), qid
+            assert any("| PASS MEANS: " in x for x in block), qid
+
+
+def test_only_q02_and_q09_expect_a_review_flag(questions):
+    flagged = {q.id: q.expect.escalated for q in questions if q.expect.escalated is not None}
+    assert flagged == {"q02": True, "q09": True}

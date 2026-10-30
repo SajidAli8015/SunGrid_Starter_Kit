@@ -107,7 +107,8 @@ cost-per-1,000 number and the monitoring section of the design record.
 
 ## Evaluation
 `eval/questions.yaml` (15-20 questions) + `python -m sungrid_copilot.cli eval`. Automated checks: category match, expected
-source in top-k, tool called or not, gate outcome, must-not-contain. Answer quality is hand-graded from a
+source in top-k, source cited (answered replies only), outcome, tool called or not, review flag where expected,
+no `$` in a non-eligible reply. Reply wording and facts are not auto-checked; answer quality is hand-graded from a
 generated CSV. Report counts (for example 15/18), not percentages. Failures are included, never hidden.
 
 ## Working agreements

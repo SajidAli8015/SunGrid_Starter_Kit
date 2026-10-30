@@ -1,8 +1,8 @@
 """Full-context BASELINE: every KB chunk in one prompt, no classification, filter or retrieval.
 
 A comparison point for the pipeline, not the product. Eligibility and non_relevant questions are
-skipped (they exercise the tool and the decline, which this baseline does not have). Only the text
-checks are scored; retrieval, category, tool and escalation checks are N/A.
+skipped (they exercise the tool and the decline, which this baseline does not have). Only outcome_ok
+and cited_ok are scored; the other checks are N/A.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sungrid_copilot.messages import Messages
 from sungrid_copilot.usage import CallRecord, UsageTracker
 
 SKIP_TAGS = {"eligibility", "non_relevant"}
-TEXT_CHECKS = {"contains_ok", "not_contains_ok", "hard_gate_ok"}
+SCORED_CHECKS = {"outcome_ok", "cited_ok"}
 ComposerFactory = Callable[[], tuple[AnswerComposer, UsageTracker]]
 CostFn = Callable[[list[CallRecord]], float | None]
 
@@ -70,7 +70,7 @@ def run_full_context_question(
         estimated_cost_usd=cost_fn(usage.calls) if cost_fn else None,
     )
     record["checks"], record["check_details"], record["auto_pass"] = run_checks(
-        q, record, only=TEXT_CHECKS
+        q, record, only=SCORED_CHECKS
     )
     return record
 

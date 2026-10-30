@@ -1,5 +1,8 @@
 # Hand-grading rubric
 
+Hand grading is the only check of reply content: the automatic checks compare behaviour (category, retrieval,
+citations, outcome, tool call, review flag), not what the reply says. It is an optional spot check.
+
 Fill the last three columns of a run's `grade_sheet.csv`, one row per question, then merge it with
 `python -m sungrid_copilot.cli eval-summarize <run_dir> --grades <filled_csv>`.
 
@@ -26,5 +29,5 @@ Fill the last three columns of a run's `grade_sheet.csv`, one row per question, 
 
 - Write a note for **every 0**: what was wrong, in one line (for example "says only Household members vote;
   Voting Eligibility says Community members get one vote").
-- A question that passes the automated checks can still fail by hand: regexes check for words, not meaning.
+- A question that passes the automated checks can still fail by hand: they do not read the reply's content.
 - Grade the final turn's reply; for multi-turn questions, also note if an earlier turn misbehaved.

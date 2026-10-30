@@ -5,24 +5,44 @@ statistically meaningful.
 
 ## 1. The evaluation set
 
-- 20 held-out questions in `eval/questions.yaml`: 15 knowledge questions covering all five categories, 3 eligibility
+- 20 questions in `eval/questions.yaml`: 15 knowledge questions covering all five categories, 3 eligibility
   questions (eligible, ineligible, multi-turn slot filling) and 2 out-of-scope questions.
 - It includes the traps the brief names: two questions that depend on document 06, a terse fault-code query that must
   not be declined, a question whose answer is not in the knowledge base, an arithmetic cap, and a time-qualified
   statistic.
-- **Provenance:** the set was written after the first end-to-end demo runs, so it is not blind. Three questions are
-  tagged `seen_in_demo` because they closely mirror a demo query. Thresholds were calibrated on a separate development
-  set (`eval/dev_queries.yaml`), and no prompt, threshold or manifest entry was changed after the first run on this
-  set.
-- **Two kinds of scoring.** Ten automated checks (category, retrieval, citation, outcome, tool use, escalation,
-  required and forbidden text, and the dollar-amount hard gate) are coarse regex proxies. Each answer was then graded
-  by hand against a reference answer on two points: `correct` and `grounded` (`eval/RUBRIC.md`). I did the manual
-  grading myself, for both the pipeline run and the full-context run, as a single grader; there was no second grader.
-  The reasons for every score of 0 are in section 2.
+- **Provenance:** the question set was written after the first end-to-end demo runs, so it is not blind. It is a
+  behaviour and regression check, not an accuracy benchmark. Thresholds were calibrated on a separate development set
+  (`eval/dev_queries.yaml`).
+- **Scoring (v2 criteria).** The automatic checks compare what the system did with what the question file expects:
+  category, retrieved documents, cited sources (for answered replies), outcome, tool call and, on q02 and q09, the
+  human-review flag, plus a fixed rule that non-eligible replies contain no `$`. **Reply correctness is not scored
+  automatically in v2**, and there is no LLM judge. Reply wording and facts, including dollar figures and safety
+  wording, are not auto-checked (`eval/README.md` lists what this costs per question). Hand grading is the only check of reply content and is an optional spot check.
+- **Earlier results (v1 criteria).** The figures below this section, unless marked otherwise, came from the earlier
+  criteria: ten automated checks that included regex wording checks and an escalation check, plus hand grading against
+  a reference answer on `correct` and `grounded` (`eval/RUBRIC.md`). I did the manual grading myself, for both the
+  pipeline run and the full-context run, as a single grader; there was no second grader. These figures are not
+  comparable with v2 numbers.
 
-## 2. Results: the pipeline
+## Results: v2 criteria
+
+TODO: fill from the eval v2 run.
 
 | Measure | Result |
+|---|---|
+| Automated pass (`auto_pass`) | TODO: fill from the eval v2 run |
+| `category_ok` | TODO: fill from the eval v2 run |
+| `retrieval_ok` | TODO: fill from the eval v2 run |
+| `cited_ok` | TODO: fill from the eval v2 run |
+| `outcome_ok` | TODO: fill from the eval v2 run |
+| `tool_ok` | TODO: fill from the eval v2 run |
+| `escalation_ok` | TODO: fill from the eval v2 run |
+| `hard_gate_ok` | TODO: fill from the eval v2 run |
+| Errors | TODO: fill from the eval v2 run |
+
+## 2. Results: the pipeline, v1 criteria (regex checks + hand grading)
+
+| Measure (v1 criteria) | Result |
 |---|---|
 | Automated pass (`auto_pass`) | 18/20 |
 | Same outcome and same `auto_pass` across 3 repeats | 20/20 |
@@ -41,8 +61,9 @@ statistically meaningful.
 | q13 (members and installed capacity) | Abstained, although the figures (just over 5,000 members, 38 MW) are in the annual report. | The report states the figures as of fiscal year end; the question asks about "now". The composer treated the mismatch as missing information. | A prompt rule: answer with the figure and state its date scope. |
 | q15 (who decides, how long to appeal, where) | Automated checks pass. Hand grading: incomplete, because the answer does not say who makes the reversal decision. | Retrieved the right documents; the composer did not state the decision maker. | Same claim-checking pass, with a completeness check against the question. |
 
-q02 is the most important. It is a confident, plausible and wrong answer, and it passes every check except
-escalation. The hand grading caught it; the regexes could not.
+q02 is the most important. It is a confident, plausible and wrong answer, and under v1 it passed every check except
+escalation. The hand grading caught it; the regexes could not. Under v2 `escalation_ok` still fails it when the reply is
+not flagged for review, but it does not read the reply: only hand grading can catch the wrong "No" itself.
 
 ### Why each question was graded 0
 
@@ -61,7 +82,7 @@ source. A score of 1 means I found the reference's key facts in the answer and n
 q13 in the full-context run was graded correct: the figures match the reference. It does not say the figures are as
 of fiscal year end, which I counted as a minor omission rather than an error.
 
-## 3. Baseline: all documents in one prompt
+## 3. Baseline: all documents in one prompt (v1 criteria)
 
 To test whether retrieval earns its place, the same composer was run with all 69 chunks in one prompt (about 5,000
 input tokens), with no classifier, filter or search. It can only run the 15 knowledge questions.
@@ -127,8 +148,18 @@ What this shows:
 - **Conditions:** three questions ran in parallel, LLM caches were off, and a single Azure deployment was called over
   the public internet from one machine. This is not a load test. The first question each worker ran was consistently
   slow (10 to 13 s), which I believe is first-call warm-up but have not confirmed.
-- **Repeats:** the 3-repeat run shows the same outcomes every time; its latency and cost figures are means of the
-  three runs.
+- **Repeats:** in the 3-repeat run every question gave the same outcome and the same `auto_pass` each time (20/20).
+  The summary tables for that run (`summary.md`) report the first repeat only, and so do the counts, latency and cost
+  figures in sections 2 and 4 of this report.
+- **Which run each figure comes from:**
+  - Sections 2 and 4 (automated counts, latency, cost, tokens): the repeat run `20261021T071440Z`, first repeat,
+    commit `389754f`. The earlier single run `20261020T155131Z` (commit `3228bbc`) also scored 18/20.
+  - Pipeline hand grading (17/20 correct, 16/17 grounded): the grade sheet of the first single run
+    `20261020T155131Z`.
+  - Full-context run and its hand grading: `20261021T073235Z-full-context`, commit `389754f`.
+  - The same-15-questions comparison in section 3 was computed from the saved `results.json` files of all three runs.
+    The pipeline cost came to $6.09 per 1,000 queries in the single run and $6.13 in the repeat run, averaged over its
+    three repeats.
 
 ## 5. What I would do next
 
@@ -144,7 +175,7 @@ What this shows:
 ## 6. Limitations
 
 - Small n, a set that is not blind, and a single grader.
-- Regexes are a coarse proxy for correctness; hand grading disagreed with them on q15.
+- Reply correctness is not scored automatically in v2. A reply can pass every check and still be wrong.
 - The classifier's confidence is self-reported and not calibrated.
 - The output guard cannot detect dollar amounts written in words.
 - Every eligibility result comes from a stub; the real service's behaviour, latency and failure modes are unknown.

@@ -11,7 +11,7 @@ VALID = {
             "tags": ["billing_account"],
             "turns": [{"say": "When is my bill due?"}],
             "expect": {"category_any": ["billing_account"], "sources": ["bills"],
-                       "must_contain": ["21\\s*days"], "escalated": None},
+                       "escalated": True},
             "reference": "Within 21 days.",
         },
         {
@@ -39,11 +39,11 @@ def test_valid_file_parses(tmp_path):
     "mutate, message",
     [
         (lambda d: d["questions"][0].update(surprise=1), "surprise"),
-        (lambda d: d["questions"][0]["expect"].update(must_contian=["x"]), "must_contian"),
+        (lambda d: d["questions"][0]["expect"].update(sorces=["x"]), "sorces"),
+        (lambda d: d["questions"][0]["expect"].update(must_contain=["x"]), "must_contain"),
+        (lambda d: d["questions"][0]["expect"].update(must_not_contain=["x"]), "must_not_contain"),
         (lambda d: d["questions"][0]["turns"][0].update(expect="x"), "expect"),
         (lambda d: d["questions"][1].update(id="q1"), "duplicate question ids: q1"),
-        (lambda d: d["questions"][0]["expect"].update(must_not_contain=["(unclosed"]), "does not compile"),
-        (lambda d: d["questions"][0]["expect"].update(must_contain=["[a-"]), "does not compile"),
         (lambda d: d["questions"][0].update(turns=[]), "turns"),
     ],
 )

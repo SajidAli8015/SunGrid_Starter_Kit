@@ -35,14 +35,14 @@ If the system forces the document into one category, half of the questions about
 
 ## Evidence
 
-Two held-out questions are tagged `ambiguous_doc` (q14 from the billing side, q15 from the rebate side). Both retrieve
+Two evaluation questions are tagged `ambiguous_doc` (q14 from the billing side, q15 from the rebate side). Both retrieve
 document 06 and pass every automated check, in all three repeats (`eval_report.md`).
 
 ## Limits
 
 - Two questions show the mechanism works; they do not measure how often it fails. The set is small.
 - The classifier's confidence is self-reported by the model and is not calibrated. The thresholds were set on a
-  separate development set, not on the held-out questions.
+  separate development set, not on the evaluation questions.
 - The categories for documents 07 to 14 are my assumption: the starter kit labels only the first six. They are
   recorded in the manifest and are easy to change.
 - Retrieving document 06 does not guarantee a complete answer. The pipeline's answer to q15 did not say who makes the

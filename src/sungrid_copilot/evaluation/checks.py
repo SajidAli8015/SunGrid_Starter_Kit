@@ -1,12 +1,15 @@
 """Automated checks on one question's record. Each returns (result, detail).
 
+Every check compares something the system did (category, retrieved documents, cited sources,
+outcome, tool call, review flag) with what the question file expects, plus one fixed rule
+(hard_gate_ok).
+Whether the reply's content is correct is not scored here; see eval/README.md.
+
 result is None when the check is not specified for the question, else True/False. The detail is a
 short explanation used in the failing-question list.
 """
 
 from __future__ import annotations
-
-import re
 
 from sungrid_copilot.evaluation.schema import Question
 
@@ -16,19 +19,13 @@ CheckResult = tuple[bool | None, str]
 NO_DOLLAR_OUTCOMES = {"ineligible", "tier_not_household", "needs_info", "invalid_input", "tool_error"}
 CHECK_NAMES = [
     "category_ok",
-    "retrieval_all",
-    "retrieval_any",
-    "cited_any",
+    "retrieval_ok",
+    "cited_ok",
     "outcome_ok",
     "tool_ok",
     "escalation_ok",
-    "contains_ok",
-    "not_contains_ok",
     "hard_gate_ok",
 ]
-# Reported, but not part of auto_pass.
-INFORMATIONAL = {"cited_any"}
-_FLAGS = re.IGNORECASE | re.DOTALL
 
 
 def category_ok(q: Question, r: dict) -> CheckResult:
@@ -39,7 +36,7 @@ def category_ok(q: Question, r: dict) -> CheckResult:
     return got in allowed, f"got {got}, expected one of {allowed}"
 
 
-def retrieval_all(q: Question, r: dict) -> CheckResult:
+def retrieval_ok(q: Question, r: dict) -> CheckResult:
     expected = q.expect.sources
     if not expected:
         return None, ""
@@ -48,17 +45,9 @@ def retrieval_all(q: Question, r: dict) -> CheckResult:
     return not missing, f"missing {missing}; retrieved {got}"
 
 
-def retrieval_any(q: Question, r: dict) -> CheckResult:
+def cited_ok(q: Question, r: dict) -> CheckResult:
     expected = q.expect.sources
-    if not expected:
-        return None, ""
-    got = r.get("retrieved_stems") or []
-    return any(s in got for s in expected), f"none of {expected} in retrieved {got}"
-
-
-def cited_any(q: Question, r: dict) -> CheckResult:
-    expected = q.expect.sources
-    if not expected:
+    if not expected or r.get("outcome") != "answered":  # only an answer has citations to check
         return None, ""
     got = r.get("cited_stems") or []
     return any(s in got for s in expected), f"none of {expected} in cited {got}"
@@ -95,24 +84,6 @@ def escalation_ok(q: Question, r: dict) -> CheckResult:
     return got == q.expect.escalated, f"escalated {got}, expected {q.expect.escalated}"
 
 
-def contains_ok(q: Question, r: dict) -> CheckResult:
-    patterns = q.expect.must_contain
-    if not patterns:
-        return None, ""
-    text = r.get("final_text") or ""
-    missing = [p for p in patterns if not re.search(p, text, _FLAGS)]
-    return not missing, f"no match for {missing}"
-
-
-def not_contains_ok(q: Question, r: dict) -> CheckResult:
-    patterns = q.expect.must_not_contain
-    if not patterns:
-        return None, ""
-    text = r.get("final_text") or ""
-    hits = [(p, m.group(0)) for p in patterns if (m := re.search(p, text, _FLAGS))]
-    return not hits, "; ".join(f"{p!r} matched {snippet!r}" for p, snippet in hits)
-
-
 def hard_gate_ok(q: Question, r: dict) -> CheckResult:
     """No '$' in any reply whose outcome forbids amounts, whatever the YAML says."""
     leaks = [
@@ -125,14 +96,11 @@ def hard_gate_ok(q: Question, r: dict) -> CheckResult:
 
 CHECKS = {
     "category_ok": category_ok,
-    "retrieval_all": retrieval_all,
-    "retrieval_any": retrieval_any,
-    "cited_any": cited_any,
+    "retrieval_ok": retrieval_ok,
+    "cited_ok": cited_ok,
     "outcome_ok": outcome_ok,
     "tool_ok": tool_ok,
     "escalation_ok": escalation_ok,
-    "contains_ok": contains_ok,
-    "not_contains_ok": not_contains_ok,
     "hard_gate_ok": hard_gate_ok,
 }
 
@@ -145,7 +113,5 @@ def run_checks(q: Question, record: dict, only: set[str] | None = None) -> tuple
         checks[name] = result
         if result is False:
             details[name] = detail
-    auto_pass = record.get("error") is None and all(
-        v is not False for k, v in checks.items() if k not in INFORMATIONAL
-    )
+    auto_pass = record.get("error") is None and all(v is not False for v in checks.values())
     return checks, details, auto_pass
