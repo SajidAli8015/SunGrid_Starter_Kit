@@ -19,7 +19,6 @@ This is a prototype for the Ahya Lead AI & Data Science assessment.
 - [Evaluation](#evaluation)
 - [Testing](#testing)
 - [Configuration](#configuration)
-- [Assessment deliverables](#assessment-deliverables)
 - [Assumptions and limitations](#assumptions-and-limitations)
 - [Security](#security)
 
@@ -360,24 +359,6 @@ Other configuration files:
 - `config/categories.yaml`: categories, the single source of truth.
 - `config/doc_manifest.yaml`: per-document title, categories and owner.
 - `config/messages.yaml`: all fixed member-facing text.
-
-## Assessment deliverables
-
-| File | What it is |
-|---|---|
-| [README.md](submission/README.md) | Index of the folder |
-| [technical_design_record.md](submission/technical_design_record.md) | Key decisions, results and the proposed production design |
-| [architecture_diagram.png](submission/architecture_diagram.png) | Proposed production layout on AWS |
-| [flow_diagram.png](submission/flow_diagram.png) | End-to-end flow of one member message |
-| [ambiguity_note.md](submission/ambiguity_note.md) | How the ambiguous document 06 is handled |
-| [sop_new_document_category.md](submission/sop_new_document_category.md) | Procedure for adding a new document category |
-| [change_control_prompt_and_model.md](submission/change_control_prompt_and_model.md) | Change control for prompts, thresholds and the language model |
-| [code_review.md](submission/code_review.md) | Code review of the prototype |
-| [feedback_note.md](submission/feedback_note.md) | Feedback note to the Associate |
-| [delivery_plan_6_week.md](submission/delivery_plan_6_week.md) | Six-week plan from prototype to a limited production release |
-| [eval_report.md](submission/eval_report.md) | Evaluation report |
-| [eval_summary.md](submission/eval_summary.md) | Raw summary of the reported evaluation run |
-| [executive_brief.pdf](submission/executive_brief.pdf) | Executive brief with a pilot recommendation |
 
 ## Assumptions and limitations
 
