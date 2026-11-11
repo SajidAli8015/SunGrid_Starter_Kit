@@ -74,15 +74,15 @@ Prices come from a third-party page, not yet checked against Microsoft's; on Bed
 predictable:** caps on output tokens and retrieved chunks (both settings), a cheaper model for the classifier, caching
 common answers, a daily budget alarm on logged cost per query, and re-pricing on every model change.
 
-## 6. Failure modes: five most likely wrong or harmful answers
+## 6. Failure modes: the five most likely wrong or harmful answers
 
-| # | Failure | Likelihood | Mitigation | Human review |
+| # | What could go wrong (example) | Likelihood | How it is prevented | Where a person checks |
 |---|---|---|---|---|
-| 1 | Confident answer the documents do not support (q02), or conflicting documents merged into one answer | Medium | Citation checks (built); check restrictive claims against the cited text (planned) | Flagged answers to the review queue; weekly sample |
-| 2 | Member details misread, so the eligibility result is wrong | Medium | Only stated values used; missing ones asked; "preliminary" label; service amount only; tier from member record (planned) | Committee makes the final decision; sampled |
-| 3 | A member-specific rebate amount from the answer step when the classifier misses an eligibility question | Low to medium | Prompt rule today; code check that every amount appears in the cited text (planned) | Guard hits alert; sampled |
-| 4 | Partial answer: wrong category hides a document, or a follow-up loses its context | Medium | Unfiltered search always runs; margin fallback; pass recent turns (planned) | Abstentions flagged; weekly sample |
-| 5 | A safety answer (fault code needing an inspection) is not flagged | Low | Prompt rule to flag safety answers; safety questions in the evaluation set | Every safety-flagged answer reviewed by a specialist |
+| 1 | **A confident answer the documents do not support.** Asked "Can a Community member run for the board?", it said "No"; the documents never say. | Medium | Built: every answer must cite the documents it used. Planned: a second check that the cited text really says what the answer claims. | Unsupported answers go to the review queue; staff review a weekly sample. |
+| 2 | **The member's details are misread**, so the eligibility result is wrong (for example, a monthly income read as yearly). | Medium | Only details the member clearly states are used; anything unclear is asked again. The result is labelled "preliminary". Planned: tier and address taken from the member's account. | The Incentive Program committee makes the final decision. |
+| 3 | **A rebate amount for a specific member is given outside the eligibility check**, if a question like "How much would my 7.5 kW system get?" is not recognised as an eligibility question. | Low to medium | Today: an instruction to the AI. Planned: code blocks any amount that is not written in the cited documents. | An alert fires when the safety check removes an amount; such cases are reviewed. |
+| 4 | **An incomplete answer**: the right document is missed, or a follow-up question loses the earlier context. | Medium | Search always also runs across all documents, so a wrong topic label cannot hide the right one. Planned: earlier messages passed with a follow-up. | When it cannot answer, it says so and passes the question on; weekly sample. |
+| 5 | **A safety issue is not flagged**: for example, a fault code that needs an installer visit is answered as routine. | Low | The AI is instructed to flag safety answers; safety questions are part of the test set. | Every flagged safety answer is reviewed by a specialist. |
 
 ## 7. If SunGrid adds a category next month
 
