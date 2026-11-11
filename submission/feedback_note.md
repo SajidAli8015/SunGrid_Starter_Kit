@@ -8,11 +8,17 @@ questions that failed. That is the part I value most.
 
 ## What went well
 
-- **You put the important rule in code.** A member who fails an eligibility condition cannot get an estimate, however
-  the model behaves. That was the right call.
-- **You were honest.** You named the shortcuts you took and the questions you did not get right. It made your
-  numbers easy to trust.
-- **Your code is small and easy to read**, and the tests pass.
+- **The rebate rule is enforced in code, not left to the AI.** The official service decides, and the code makes it
+  impossible to show an amount to a member who does not qualify.
+- **You added safety checks the service does not have.** The rebate is only for Household members, so you check the
+  tier first and never call the service for other tiers. You also check every input before the call (a real ZIP code,
+  a true yes/no for the installer), because the service trusts whatever it is sent.
+- **It asks instead of guessing.** Missing details are collected in one clear question, and anything unclear is left
+  empty rather than assumed. If the service is slow or fails, the member is told it cannot check right now, never given a guess.
+- **Off-topic questions are declined carefully.** A question is only refused when the AI is very sure it is off-topic
+  and no SunGrid document matches, so a short query like "Error E12" is still answered.
+- **You were honest, and the code is easy to read.** You named the shortcuts and the failed questions, kept member
+  details out of the logs, and the tests pass.
 
 ## Four things to work on
 
